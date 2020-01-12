@@ -4001,6 +4001,7 @@ function sel_all_regions() {
 
   toggle_all_regions_selection(true);
   _via_is_all_region_selected = true;
+  _via_is_region_selected = true;
   _via_redraw_reg_canvas();
 }
 
