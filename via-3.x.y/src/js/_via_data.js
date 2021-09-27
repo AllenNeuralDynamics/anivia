@@ -42,6 +42,7 @@ _via_data.prototype._init_default_project = function() {
       'file_content_align':'center',
       'file_metadata_editor_visible':true,
       'spatial_metadata_editor_visible':true,
+      'temporal_segment_metadata_editor_visible':true,
       'spatial_region_label_attribute_id':'',
       'gtimeline_visible_row_count':'4',
     },

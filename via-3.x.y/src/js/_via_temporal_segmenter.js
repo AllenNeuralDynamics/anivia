@@ -82,6 +82,10 @@ function _via_temporal_segmenter(file_annotator, container, vid, data, media_ele
 }
 
 _via_temporal_segmenter.prototype._init = function() {
+  if ( ! this.d.store.config.ui.hasOwnProperty('temporal_segment_metadata_editor_visible') ) {
+    this.d.store.config.ui['temporal_segment_metadata_editor_visible'] = true;
+  }
+
   this.group_aid_candidate_list = [];
   if ( this.d.cache.attribute_group.hasOwnProperty('FILE1_Z2_XY0') ) {
     for ( var aindex in this.d.cache.attribute_group['FILE1_Z2_XY0'] ) {
@@ -456,6 +460,11 @@ _via_temporal_segmenter.prototype._tmetadata_init = function() {
   this.gmetadata_container.appendChild(this.gmetadata_grid);
   this.tmetadata_container.appendChild(this.gmetadata_container);
   // Note: this.tmetadata_container has already been added to parent container
+
+  this.tseg_metadata_container = document.createElement('div');
+  this.tseg_metadata_container.setAttribute('class', 'tseg_metadata_container');
+  this._tseg_metadata_hide();
+  this.tmetadata_container.appendChild(this.tseg_metadata_container);
 
   if ( this.gid_list.length ) {
     this._tmetadata_group_gid_sel(0);
@@ -1479,11 +1488,13 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_mousedown = function(e) {
       } else {
         // else, select metadata
         this._tmetadata_group_gid_sel_metadata(mindex);
+        this._tseg_metadata_show();
       }
     } else {
       if ( this.selected_mindex !== -1 ) {
         // remove metadata selection
         this._tmetadata_group_gid_remove_mid_sel(this.selected_mindex);
+        this._tseg_metadata_hide();
       }
     }
   }
@@ -2267,4 +2278,251 @@ _via_temporal_segmenter.prototype._on_event_metadata_update_bulk = function(data
   if ( this.vid === event_payload.vid ) {
     _via_util_msg_show('Updated ' + event_payload.mid_list.length + ' metadata');
   }
+}
+
+//
+// temporal segment metadata container
+//
+_via_temporal_segmenter.prototype._tseg_metadata_show = function() {
+  this.tseg_metadata_container.classList.remove('hide');
+  this._tseg_metadata_update();
+  this._tseg_metadata_set_position();
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_hide = function() {
+  this.tseg_metadata_container.classList.add('hide');
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_toggle = function() {
+  this.d.store.config.ui['temporal_segment_metadata_editor_visible'] = ! this.d.store.config.ui['temporal_segment_metadata_editor_visible'];
+  this._tseg_metadata_show();
+  this._tseg_metadata_update();
+  this._tseg_metadata_set_position();
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_update = function() {
+  this.tseg_metadata_container.innerHTML = '';
+  var tseg_aid_list = [];
+
+  for(var aid in this.d.store.attribute) {
+    if(this.d.store.attribute[aid]['anchor_id'] === 'FILE1_Z2_XY0' &&
+       aid != this.groupby_aid) {
+      tseg_aid_list.push(aid);
+    }
+  }
+
+  if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
+    var table = document.createElement('table');
+    var header = this._tseg_metadata_header_html(tseg_aid_list);
+    var th = document.createElement('th');
+    th.setAttribute('rowspan', '2');
+    th.appendChild(this._tseg_metadata_toggle_button());
+    header.appendChild(th)
+    table.appendChild(header);
+
+    // show value of each attribute
+    var tbody = document.createElement('tbody');
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-mid', mid);
+
+    var mid = this.selected_mid;
+    var aid;
+    for ( var aindex in tseg_aid_list ) {
+      aid = tseg_aid_list[aindex];
+      var td = document.createElement('td');
+      td.setAttribute('data-aid', aid);
+      td.appendChild( this._tseg_metadata_attribute_io_html_element(mid, aid) );
+      tr.appendChild(td);
+    }
+    var td = document.createElement('td');
+    tr.appendChild(td); // empty row for control buttons
+
+    tbody.appendChild(tr);
+    table.appendChild(tbody);
+
+    this.tseg_metadata_container.innerHTML = '';
+    this.tseg_metadata_container.appendChild(table);
+  } else {
+    this.tseg_metadata_container.innerHTML = '';
+    var table = document.createElement('table');
+    table.appendChild(this._tseg_metadata_toggle_button());
+    this.tseg_metadata_container.appendChild(table);
+  }
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_set_position = function() {
+  var gid = this.selected_gid;
+  var mid = this.selected_mid;
+
+  var t0 = this.d.store.metadata[mid].z[0];
+  var t1 = this.d.store.metadata[mid].z[1];
+  var tseg_x0 = this._tmetadata_gtimeline_time2canvas(t0);
+  var tseg_x1 = this._tmetadata_gtimeline_time2canvas(t1);
+
+  var tseg_canvas_x = this.gcanvas[gid].offsetLeft;
+  var tseg_canvas_y = this.gcanvas[gid].offsetTop;
+
+  this.tseg_metadata_container.style.left = (tseg_canvas_x + tseg_x0) + 'px';
+  this.tseg_metadata_container.style.top = (tseg_canvas_y + this.gcanvas[gid].height) + 'px';
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_header_html = function(aid_list) {
+  var tr = document.createElement('tr');
+  var aid;
+  for ( var aindex in aid_list ) {
+    aid = aid_list[aindex];
+    var th = document.createElement('th');
+    th.innerHTML = this.d.store.attribute[aid].aname;
+    tr.appendChild(th);
+  }
+  return tr;
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_on_change = function(e) {
+  var mid = e.target.dataset.mid;
+  var aid = e.target.dataset.aid;
+  var aval = e.target.value;
+  if ( e.target.type === 'checkbox' &&
+       this.d.store.metadata[mid].av.hasOwnProperty(aid)
+     ) {
+    var values = this.d.store.metadata[mid].av[aid].split(',');
+    if ( this.d.store.metadata[mid].av[aid] !== '' ) {
+      var vindex = values.indexOf(e.target.value);
+      if ( e.target.checked ) {
+        // add this value
+        if ( vindex === -1 ) {
+          values.push(e.target.value);
+        }
+      } else {
+        // remove this value
+        var vindex = values.indexOf(aval);
+        if ( vindex !== -1 ) {
+          values.splice(vindex, 1);
+        }
+      }
+      aval = values.join(',');
+    }
+  }
+
+  this.d.metadata_update_av(this.vid, mid, aid, aval).then( function(ok) {
+    //console.log( JSON.stringify(this.d.store.metadata[ok.mid].av) );
+  }.bind(this));
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_attribute_io_html_element = function(mid, aid) {
+  var aval  = this.d.store.metadata[mid].av[aid];
+  var dval  = this.d.store.attribute[aid].default_option_id;
+  var atype = this.d.store.attribute[aid].type;
+  var el;
+
+  switch(atype) {
+  case _VIA_ATTRIBUTE_TYPE.TEXT:
+    if ( typeof(aval) === 'undefined' ) {
+      aval = dval;
+    }
+    el = document.createElement('textarea');
+    el.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+    el.innerHTML = aval;
+    break;
+
+  case _VIA_ATTRIBUTE_TYPE.SELECT:
+    el = document.createElement('select');
+    if ( typeof(aval) === 'undefined' ) {
+      aval = dval;
+    }
+
+    for ( var oid in this.d.store.attribute[aid].options ) {
+      var oi = document.createElement('option');
+      oi.setAttribute('value', oid);
+      oi.innerHTML = this.d.store.attribute[aid].options[oid];
+      if ( oid === aval ) {
+        oi.setAttribute('selected', 'true');
+      }
+      el.appendChild(oi);
+    }
+    el.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+    break;
+
+  case _VIA_ATTRIBUTE_TYPE.RADIO:
+    el = document.createElement('div');
+
+    if ( typeof(aval) === 'undefined' ) {
+      aval = dval;
+    }
+
+    for ( var oid in this.d.store.attribute[aid].options ) {
+      var radio = document.createElement('input');
+      radio.setAttribute('type', 'radio');
+      radio.setAttribute('value', oid);
+      radio.setAttribute('data-mid', mid);
+      radio.setAttribute('data-aid', aid);
+      radio.setAttribute('name', this.d.store.attribute[aid].aname);
+      if ( oid === aval ) {
+        radio.setAttribute('checked', true);
+      }
+      radio.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+      var label = document.createElement('label');
+      label.innerHTML = this.d.store.attribute[aid].options[oid];
+
+      var br = document.createElement('br');
+      el.appendChild(radio);
+      el.appendChild(label);
+      el.appendChild(br);
+    }
+    break;
+
+  case _VIA_ATTRIBUTE_TYPE.CHECKBOX:
+    el = document.createElement('div');
+    if ( typeof(aval) === 'undefined' ) {
+      if ( typeof(dval) === 'undefined' ) {
+        aval = '';
+      } else {
+        aval = dval;
+      }
+    }
+    var values = aval.split(',');
+    for ( var oid in this.d.store.attribute[aid].options ) {
+      var checkbox = document.createElement('input');
+      checkbox.setAttribute('type', 'checkbox');
+      checkbox.setAttribute('value', oid);
+      checkbox.setAttribute('data-mid', mid);
+      checkbox.setAttribute('data-aid', aid);
+      checkbox.setAttribute('name', this.d.store.attribute[aid].aname);
+
+      if ( values.indexOf(oid) !== -1 ) {
+        checkbox.setAttribute('checked', true);
+      }
+      checkbox.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+      var label = document.createElement('label');
+      label.innerHTML = this.d.store.attribute[aid].options[oid];
+
+      var br = document.createElement('br');
+      el.appendChild(checkbox);
+      el.appendChild(label);
+      el.appendChild(br);
+    }
+    break;
+
+  default:
+    console.log('attribute type ' + atype + ' not implemented yet!');
+    var el = document.createElement('span');
+    el.innerHTML = aval;
+  }
+  el.setAttribute('data-mid', mid);
+  el.setAttribute('data-aid', aid);
+  return el;
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_toggle_button = function() {
+  var span = document.createElement('span');
+  span.setAttribute('class', 'text_button');
+  if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
+    span.innerHTML = '&larr;';
+    span.setAttribute('title', 'Hide (i.e. minimise) temporal segment metadata editor');
+  } else {
+    span.innerHTML = '&rarr;';
+    span.setAttribute('title', 'Show temporal segment metadata editor');
+  }
+  span.addEventListener('click', this._tseg_metadata_toggle.bind(this));
+  return span;
 }
