@@ -1281,6 +1281,7 @@ _via_temporal_segmenter.prototype._tmetadata_mid_move = function(dt) {
 _via_temporal_segmenter.prototype._tmetadata_mid_del_sel = function(mid) {
   this._tmetadata_mid_del(this.selected_mid);
   this._tmetadata_group_gid_remove_mid_sel();
+  this._tseg_metadata_hide();
   _via_util_msg_show('Temporal segment deleted.');
 }
 
@@ -2311,17 +2312,24 @@ _via_temporal_segmenter.prototype._tseg_metadata_update = function() {
     }
   }
 
+  var table = document.createElement('table');
+  var tbody = document.createElement('tbody');
+  var thead = document.createElement('thead');
+
+  var header = document.createElement('tr');
+
   if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
-    var table = document.createElement('table');
-    var header = this._tseg_metadata_header_html(tseg_aid_list);
-    var th = document.createElement('th');
-    th.setAttribute('rowspan', '2');
-    th.appendChild(this._tseg_metadata_toggle_button());
-    header.appendChild(th)
-    table.appendChild(header);
+    var aid;
+    var col_count = 0;
+    for ( var aindex in tseg_aid_list ) {
+      aid = tseg_aid_list[aindex];
+      var th = document.createElement('th');
+      th.innerHTML = this.d.store.attribute[aid].aname;
+      header.appendChild(th);
+      col_count += 1;
+    }
 
     // show value of each attribute
-    var tbody = document.createElement('tbody');
     var tr = document.createElement('tr');
     tr.setAttribute('data-mid', mid);
 
@@ -2338,16 +2346,40 @@ _via_temporal_segmenter.prototype._tseg_metadata_update = function() {
     tr.appendChild(td); // empty row for control buttons
 
     tbody.appendChild(tr);
-    table.appendChild(tbody);
-
-    this.tseg_metadata_container.innerHTML = '';
-    this.tseg_metadata_container.appendChild(table);
-  } else {
-    this.tseg_metadata_container.innerHTML = '';
-    var table = document.createElement('table');
-    table.appendChild(this._tseg_metadata_toggle_button());
-    this.tseg_metadata_container.appendChild(table);
   }
+  var minimise_button = document.createElement('span');
+  minimise_button.setAttribute('class', 'text_button');
+  if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
+    minimise_button.innerHTML = '&larr;';
+    minimise_button.setAttribute('title', 'Hide (i.e. minimise) temporal segment metadata editor');
+  } else {
+    minimise_button.innerHTML = '&rarr;';
+    minimise_button.setAttribute('title', 'Show temporal segment metadata editor');
+  }
+  minimise_button.addEventListener('click', this._tseg_metadata_toggle.bind(this));
+  var minimise_container = document.createElement('th');
+  minimise_container.setAttribute('rowspan', '2');
+  minimise_container.appendChild(minimise_button);
+  header.appendChild(minimise_container);
+  col_count += 1;
+  thead.appendChild(header);
+
+  // add a row containing all the tool buttons
+  var toolbar = document.createElement('tr');
+  var toolbar_container = document.createElement('td');
+  toolbar_container.setAttribute('colspan', tseg_aid_list.length + 1); // 1 extra column for minimise button
+  toolbar_container.setAttribute('style', 'text-align:center;')
+
+  var del = _via_util_get_svg_button('micon_delete', 'Delete selected temporal segment', 'del_selected_tset');
+  del.addEventListener('click', this._tmetadata_mid_del_sel.bind(this));
+  toolbar_container.appendChild(del);
+  toolbar.appendChild(toolbar_container);
+  tbody.appendChild(toolbar);
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  this.tseg_metadata_container.innerHTML = '';
+  this.tseg_metadata_container.appendChild(table);
 }
 
 _via_temporal_segmenter.prototype._tseg_metadata_set_position = function() {
@@ -2363,7 +2395,7 @@ _via_temporal_segmenter.prototype._tseg_metadata_set_position = function() {
   var tseg_canvas_y = this.gcanvas[gid].offsetTop;
 
   this.tseg_metadata_container.style.left = (tseg_canvas_x + tseg_x0) + 'px';
-  this.tseg_metadata_container.style.top = (tseg_canvas_y + this.gcanvas[gid].height) + 'px';
+  this.tseg_metadata_container.style.top = (tseg_canvas_y - this.tseg_metadata_container.offsetHeight) + 'px';
 }
 
 _via_temporal_segmenter.prototype._tseg_metadata_header_html = function(aid_list) {
