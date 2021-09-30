@@ -2763,14 +2763,19 @@ _via_file_annotator.prototype._metadata_attribute_io_html_element = function(mid
       aval = dval;
     }
 
+    var option_selected = false;
     for ( var oid in this.d.store.attribute[aid].options ) {
       var oi = document.createElement('option');
       oi.setAttribute('value', oid);
       oi.innerHTML = this.d.store.attribute[aid].options[oid];
       if ( oid === aval ) {
         oi.setAttribute('selected', 'true');
+        option_selected = true;
       }
       el.appendChild(oi);
+    }
+    if(!option_selected) {
+      el.selectedIndex = -1; // to indicate that nothing has been selected
     }
     el.addEventListener('change', this._metadata_on_change.bind(this));
     break;

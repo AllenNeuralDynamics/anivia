@@ -536,6 +536,7 @@ _via_temporal_segmenter.prototype._tmetadata_gid_list_reorder = function(gindex_
 
 _via_temporal_segmenter.prototype._tmetadata_onchange_groupby_aid = function(e) {
   this.group_aname_select.blur(); // remove selection of dropdown
+  this._tseg_metadata_hide();
   var new_groupby_aid = e.target.options[e.target.selectedIndex].value;
   this._group_init( new_groupby_aid );
   this._tmetadata_gmetadata_update();
@@ -1459,6 +1460,7 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_mousedown = function(e) {
   if ( gindex !== this.selected_gindex ) {
     // select this gid
     this._tmetadata_group_gid_sel(gindex);
+    this._tseg_metadata_hide();
   }
 
   var edge = this._tmetadata_group_gid_is_on_edge(gid, t);
@@ -2463,14 +2465,19 @@ _via_temporal_segmenter.prototype._tseg_metadata_attribute_io_html_element = fun
       aval = dval;
     }
 
+    var option_selected = false;
     for ( var oid in this.d.store.attribute[aid].options ) {
       var oi = document.createElement('option');
       oi.setAttribute('value', oid);
       oi.innerHTML = this.d.store.attribute[aid].options[oid];
       if ( oid === aval ) {
         oi.setAttribute('selected', 'true');
+        option_selected = true;
       }
       el.appendChild(oi);
+    }
+    if(!option_selected) {
+      el.selectedIndex = -1; // to indicate that nothing has been selected
     }
     el.addEventListener('change', this._tseg_metadata_on_change.bind(this));
     break;
@@ -2543,18 +2550,4 @@ _via_temporal_segmenter.prototype._tseg_metadata_attribute_io_html_element = fun
   el.setAttribute('data-mid', mid);
   el.setAttribute('data-aid', aid);
   return el;
-}
-
-_via_temporal_segmenter.prototype._tseg_metadata_toggle_button = function() {
-  var span = document.createElement('span');
-  span.setAttribute('class', 'text_button');
-  if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
-    span.innerHTML = '&larr;';
-    span.setAttribute('title', 'Hide (i.e. minimise) temporal segment metadata editor');
-  } else {
-    span.innerHTML = '&rarr;';
-    span.setAttribute('title', 'Show temporal segment metadata editor');
-  }
-  span.addEventListener('click', this._tseg_metadata_toggle.bind(this));
-  return span;
 }
