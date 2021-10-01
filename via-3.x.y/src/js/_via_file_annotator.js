@@ -936,7 +936,10 @@ _via_file_annotator.prototype._rinput_mouseup_handler = function(e) {
                                             this.resize_control_point_index);
         } else if(this.resize_type === 'edge') {
           // add a new vertex
-          // @todo
+          this._metadata_polygon_add_vertex(this.resize_selected_mid_index,
+                                            this.resize_control_point_index,
+                                            this.resize_edge_xy[0],
+                                            this.resize_edge_xy[1]);
         }
       }
     } else {
@@ -1273,10 +1276,31 @@ _via_file_annotator.prototype._metadata_polygon_del_vertex = function(mindex, cp
   return new Promise( function(ok_callback, err_callback) {
     var mid = this.selected_mid_list[mindex];
     var xy_with_del_cp = this.d.store.metadata[mid].xy.slice();
-    xy_with_del_cp.splice(1 + 2*cpindex, 2); // +1 because first element is shape_id
+    // note: cpindex is indexed from 1
+    var del_cpindex = cpindex - 1;
+    xy_with_del_cp.splice(1 + 2*del_cpindex, 2); // +1 because first element is shape_id
     this.d.metadata_update_xy(this.vid, mid, xy_with_del_cp).then( function(ok) {
       this._creg_draw_all();
       _via_util_msg_show('Deleted vertex at index [' + cpindex + ']');
+      ok_callback(ok.mid);
+    }.bind(this), function(err) {
+      console.warn(err);
+      err_callback();
+    }.bind(this));
+  }.bind(this));
+}
+
+_via_file_annotator.prototype._metadata_polygon_add_vertex = function(mindex, cpindex, cx, cy) {
+  return new Promise( function(ok_callback, err_callback) {
+    var mid = this.selected_mid_list[mindex];
+    var x = cx * this.cscale;
+    var y = cy * this.cscale;
+    var xy_with_added_cp = this.d.store.metadata[mid].xy.slice();
+    var new_cp_index = cpindex + 1; // add to the next position
+    xy_with_added_cp.splice(1 + 2*new_cp_index, 0, x, y); // +1 because first element is shape_id
+    this.d.metadata_update_xy(this.vid, mid, xy_with_added_cp).then( function(ok) {
+      this._creg_draw_all();
+      _via_util_msg_show('Added vertex after existing vertex at index [' + cpindex + ']');
       ok_callback(ok.mid);
     }.bind(this), function(err) {
       console.warn(err);
@@ -1899,12 +1923,10 @@ _via_file_annotator.prototype._creg_is_near_a_point = function(px, py, x, y, tol
 _via_file_annotator.prototype._creg_is_on_control_point = function(xy, cx, cy, tolerance) {
   var cp = this._creg_get_control_points(xy); // cp[0] = shape_id
   var n = cp.length;
-  var cp_index = 0;
   for ( var i = 1; i < n; i = i + 2 ) {
     if ( this._creg_is_near_a_point(cp[i], cp[i+1], cx, cy, tolerance) ) {
-      return cp_index; // to convert xy index to control point index
+      return (i+1)/2; // to convert xy index to control point index
     }
-    cp_index = cp_index + 1;
   }
   return -1;
 }
@@ -1978,7 +2000,7 @@ _via_file_annotator.prototype.is_point_inside_bounding_box = function(x, y, x1, 
   }
 }
 
-_via_file_annotator.prototype._creg_is_on_sel_region_cp = function(cx, cy, tolerance) {
+_via_file_annotator.prototype._creg_is_on_sel_region_cp  = function(cx, cy, tolerance) {
   var n = this.selected_mid_list.length;
   var mid;
   var sel_region_cp = [-1, -1, '']; // [ metadata_index, control_point_index, type = {cp, edge} ]
