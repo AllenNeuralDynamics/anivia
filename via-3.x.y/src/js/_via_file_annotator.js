@@ -777,6 +777,10 @@ _via_file_annotator.prototype._rinput_mousedown_handler = function(e) {
       // mousedown was on control point of one of the selected regions
       this.resize_selected_mid_index = sel_region_cp[0];
       this.resize_control_point_index = sel_region_cp[1];
+      this.resize_type = sel_region_cp[2];
+      if(this.resize_type === 'edge') {
+        this.resize_edge_xy = [cx, cy];
+      }
       this._state_set( _VIA_RINPUT_STATE.REGION_RESIZE_ONGOING );
     } else {
       // mousedown was not on a control point, two possibilities:
@@ -915,14 +919,40 @@ _via_file_annotator.prototype._rinput_mouseup_handler = function(e) {
   }
 
   if ( this.state_id === _VIA_RINPUT_STATE.REGION_RESIZE_ONGOING ) {
-    this._metadata_resize_region(this.resize_selected_mid_index,
-                                 this.resize_control_point_index,
-                                 cx, cy);
+    var resize_mid = this.selected_mid_list[this.resize_selected_mid_index];
+    var shape_id = this.creg[resize_mid][0];
+    if((shape_id === _VIA_RSHAPE.POLYLINE || shape_id === _VIA_RSHAPE.POLYGON) &&
+       (e.ctrlKey || e.metaKey)) {
+      // if on vertex, delete it
+      // if on edge, add a new vertex
+      var npts = this.d.store.metadata[resize_mid].xy.length - 1; // -1 because first element is shape_id
+      if((shape_id === _VIA_RSHAPE.POLYLINE && npts === 4) ||
+         (shape_id === _VIA_RSHAPE.POLYGON && npts === 6)) {
+        _via_util_msg_show('Cannot delete vertex as it would result in a degenerate region');
+      } else {
+        if(this.resize_type === 'cp') {
+          // delete vertex
+          this._metadata_polygon_del_vertex(this.resize_selected_mid_index,
+                                            this.resize_control_point_index);
+        } else if(this.resize_type === 'edge') {
+          // add a new vertex
+          // @todo
+        }
+      }
+    } else {
+      this._metadata_resize_region(this.resize_selected_mid_index,
+                                   this.resize_control_point_index,
+                                   cx, cy);
+    }
+
     if(this._is_zoom_enabled) {
       this.zoom_rshape_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height); // required to clear old region
     }
     this._tmpreg_clear();
     this.user_input_pts = [];
+    this.resized_selected_mid_index = -1;
+    this.resize_control_point_index = -1;
+    this.resize_type = '';
     this._state_set( _VIA_RINPUT_STATE.REGION_SELECTED );
     return;
   }
@@ -987,6 +1017,7 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
   }
 
   if ( this.state_id === _VIA_RINPUT_STATE.REGION_SELECTED ) {
+    // sel_region_cp = [metadata_index, control_point_index, type = {'edge', 'cp'}]
     var sel_region_cp = this._creg_is_on_sel_region_cp(cx, cy,
                                                        this.conf.CONTROL_POINT_CLICK_TOL);
 
@@ -1025,7 +1056,11 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
       case _VIA_RSHAPE.LINE:
       case _VIA_RSHAPE.POLYGON:
       case _VIA_RSHAPE.POLYLINE:
-        this.input.style.cursor = 'cell';
+        this.input.style.cursor = 'crosshair';
+        // fall through and show message if it is polygon or polyline
+      case _VIA_RSHAPE.POLYGON:
+      case _VIA_RSHAPE.POLYLINE:
+        _via_util_msg_show('To move vertex, simply drag the vertex. To add vertex, press [Ctrl] key and click on the edge. To delete vertex, press [Ctrl] (or [Command]) key and click on vertex.');
         break;
       }
     } else {
@@ -1234,6 +1269,22 @@ _via_file_annotator.prototype._is_point_inside_sel_regions = function(cx, cy) {
 //
 // metadata
 //
+_via_file_annotator.prototype._metadata_polygon_del_vertex = function(mindex, cpindex) {
+  return new Promise( function(ok_callback, err_callback) {
+    var mid = this.selected_mid_list[mindex];
+    var xy_with_del_cp = this.d.store.metadata[mid].xy.slice();
+    xy_with_del_cp.splice(1 + 2*cpindex, 2); // +1 because first element is shape_id
+    this.d.metadata_update_xy(this.vid, mid, xy_with_del_cp).then( function(ok) {
+      this._creg_draw_all();
+      _via_util_msg_show('Deleted vertex at index [' + cpindex + ']');
+      ok_callback(ok.mid);
+    }.bind(this), function(err) {
+      console.warn(err);
+      err_callback();
+    }.bind(this));
+  }.bind(this));
+}
+
 _via_file_annotator.prototype._metadata_resize_region = function(mindex, cpindex, cx, cy) {
   return new Promise( function(ok_callback, err_callback) {
     var mid = this.selected_mid_list[mindex];
@@ -1848,25 +1899,106 @@ _via_file_annotator.prototype._creg_is_near_a_point = function(px, py, x, y, tol
 _via_file_annotator.prototype._creg_is_on_control_point = function(xy, cx, cy, tolerance) {
   var cp = this._creg_get_control_points(xy); // cp[0] = shape_id
   var n = cp.length;
+  var cp_index = 0;
   for ( var i = 1; i < n; i = i + 2 ) {
     if ( this._creg_is_near_a_point(cp[i], cp[i+1], cx, cy, tolerance) ) {
-      return (i+1)/2; // to convert xy index to control point index
+      return cp_index; // to convert xy index to control point index
     }
+    cp_index = cp_index + 1;
   }
   return -1;
 }
 
+_via_file_annotator.prototype._creg_is_on_polygon_edge = function(xy, cx, cy, tolerance) {
+  var cp = this._creg_get_control_points(xy); // cp[0] = shape_id
+  var n = cp.length;
+  var distance_to_edge = [];
+  for ( var i = 1; i < n - 2; i = i + 2 ) {
+    var di = this.dist_to_line(cx, cy, cp[i], cp[i+1], cp[i+2], cp[i+3]);
+    distance_to_edge.push(di);
+  }
+  var shape_id = cp[0];
+  if(shape_id === _VIA_RSHAPE.POLYGON) {
+    // add closing edge
+    var di = this.dist_to_line(cx, cy, cp[n-2], cp[n-1], cp[1], cp[2]);
+    distance_to_edge.push(di);
+  }
+
+  var smallest_value = distance_to_edge[0];
+  var smallest_index = 0;
+  n = distance_to_edge.length;
+  for ( i = 1; i < n; ++i ) {
+    if ( distance_to_edge[i] < smallest_value ) {
+      smallest_value = distance_to_edge[i];
+      smallest_index = i;
+    }
+  }
+  if ( smallest_value < tolerance ) {
+    return smallest_index;
+  } else {
+    return -1;
+  }
+}
+
+_via_file_annotator.prototype.dist_to_line = function(x, y, x1, y1, x2, y2) {
+  if ( this.is_point_inside_bounding_box(x, y, x1, y1, x2, y2) ) {
+    var dy = y2 - y1;
+    var dx = x2 - x1;
+    var nr = Math.abs( dy*x - dx*y + x2*y1 - y2*x1 );
+    var dr = Math.sqrt( dx*dx + dy*dy );
+    var dist = nr / dr;
+    return Math.round(dist);
+  } else {
+    return Number.MAX_SAFE_INTEGER;
+  }
+}
+
+_via_file_annotator.prototype.is_point_inside_bounding_box = function(x, y, x1, y1, x2, y2) {
+  // ensure that (x1,y1) is top left and (x2,y2) is bottom right corner of rectangle
+  var rect = {};
+  if( x1 < x2 ) {
+    rect.x1 = x1;
+    rect.x2 = x2;
+  } else {
+    rect.x1 = x2;
+    rect.x2 = x1;
+  }
+  if ( y1 < y2 ) {
+    rect.y1 = y1;
+    rect.y2 = y2;
+  } else {
+    rect.y1 = y2;
+    rect.y2 = y1;
+  }
+
+  if ( x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2 ) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 _via_file_annotator.prototype._creg_is_on_sel_region_cp = function(cx, cy, tolerance) {
   var n = this.selected_mid_list.length;
-  var mid, shape_id;
-  var sel_region_cp = [-1, -1];
+  var mid;
+  var sel_region_cp = [-1, -1, '']; // [ metadata_index, control_point_index, type = {cp, edge} ]
   for ( var i = 0; i < n; ++i ) {
     mid = this.selected_mid_list[i];
     var cp_index = this._creg_is_on_control_point(this.creg[mid], cx, cy, tolerance);
     // is mousedown on region control point?
     if ( cp_index !== -1 ) {
-      sel_region_cp = [i, cp_index];
+      sel_region_cp = [i, cp_index, 'cp'];
       break;
+    } else {
+      // for polyline and polygon, check if it is on the edge
+      var shape_id = this.creg[mid][0];
+      if(shape_id === _VIA_RSHAPE.POLYLINE || shape_id === _VIA_RSHAPE.POLYGON) {
+        var edge_index = this._creg_is_on_polygon_edge(this.creg[mid], cx, cy, tolerance);
+        if(edge_index !== -1) {
+          sel_region_cp = [i, edge_index, 'edge'];
+          break;
+        }
+      }
     }
   }
   return sel_region_cp;
