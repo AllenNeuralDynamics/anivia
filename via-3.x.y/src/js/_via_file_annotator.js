@@ -1029,7 +1029,11 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
         break;
       }
     } else {
-      this.input.style.cursor = 'default';
+      if( this._is_point_inside_sel_regions(cx, cy) === -1 ) {
+        this.input.style.cursor = 'default';
+      } else {
+        this.input.style.cursor = 'move';
+      }
     }
     return;
   }
