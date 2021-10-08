@@ -31,6 +31,10 @@ function _via_view_annotator(data, container ) {
   this.GTIMELINE_ROW_DEFAULT_COUNT = '4';
   this.GTIMELINE_ROW_HEIGHT_MAP = { '1':21, '2':24, '3':28, '4':32, '5':37, '6':41, '7':45,'8':49,'9':53,'10':57,'12':65,'14':73,'16':80 };
 
+  // zoom
+  this.zoom_mode = _VIA_DEFAULT_ZOOM_MODE;
+  this.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+
   // state variables
   this.region_draw_shape = _VIA_RSHAPE.RECTANGLE;
   this.creg_label_aid = '1';
@@ -54,10 +58,10 @@ _via_view_annotator.prototype._init = function() {
   }
 }
 
-_via_view_annotator.prototype._zoom_toggle = function() {
+_via_view_annotator.prototype._magnifier_toggle = function() {
   for(var i = 0; i < this.file_annotator.length; ++i) {
     for(var j = 0; j < this.file_annotator[i].length; ++j) {
-      this.file_annotator[i][j]._zoom_toggle.bind(this.file_annotator[i][j])();
+      this.file_annotator[i][j]._magnifier_toggle.bind(this.file_annotator[i][j])();
     }
   }
 }

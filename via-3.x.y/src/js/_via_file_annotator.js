@@ -36,7 +36,9 @@ function _via_file_annotator(view_annotator, data, vid, file_label, container) {
   this.last_clicked_mid_list = [];
   this.resize_control_point_index = -1;
   this.resize_selected_mid_index = -1;
-
+  this.show_region_shape = true;
+  this.show_region_label = true;
+  
   // canvas regions
   this.creg = {}; // canvas regions
   this.selected_mid_list = [];
@@ -46,11 +48,10 @@ function _via_file_annotator(view_annotator, data, vid, file_label, container) {
   this.last_cy = 0;
 
   // zoom
-  this._is_zoom_enabled = false;
-  this.zoom_scale = 3.0;
-  this.zoom_scale_index = 6;
-  this.zoom_scale_list = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0];
-  // see this.conf.ZOOM_SIZE
+  this._is_magnifier_enabled = false;
+  this.magnifier_scale = 3.0;
+  this.magnifier_scale_index = 6;
+  this.magnifier_scale_list = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0];
 
   // constants
   this.conf = {};
@@ -73,8 +74,6 @@ function _via_file_annotator(view_annotator, data, vid, file_label, container) {
   this.conf.CROSSHAIR_COLOR1 = '#1a1a1a';
   this.conf.CROSSHAIR_COLOR2 = '#e6e6e6';
   this.conf.SPATIAL_REGION_TIME_TOL = 0.02; // in sec
-  //this.conf.ZOOM_SIZE = 300; // px
-  this.conf.ZOOM_SIZE_BY2 = 150;
 
   // registers on_event(), emit_event(), ... methods from
   // _via_event to let this module listen and emit events
@@ -107,80 +106,77 @@ _via_file_annotator.prototype._init = function() {
   this.fid = this.d.store.view[this.vid].fid_list[0];
 }
 
-_via_file_annotator.prototype._zoom_toggle = function() {
-  if(this._is_zoom_enabled) {
-    this.zoom_container.classList.add('hide');
-    this._is_zoom_enabled = false;
-    this.zoom_container.innerHTML = '';
+_via_file_annotator.prototype._magnifier_toggle = function() {
+  if(this._is_magnifier_enabled) {
+    this.magnifier_container.classList.add('hide');
+    this._is_magnifier_enabled = false;
+    this.magnifier_container.innerHTML = '';
     _via_util_msg_show('Deactivated magnifying glass.');
   } else {
-    this._is_zoom_enabled = true;
-    this._zoom_activate();
-    this.zoom_container.classList.remove('hide');
-    this._zoom_update_position();
+    this._is_magnifier_enabled = true;
+    this._magnifier_activate();
+    this.magnifier_container.classList.remove('hide');
+    this._magnifier_update_position();
     _via_util_msg_show('Activated magnifying glass to allow finer inspection of feature.');
   }
 }
 
-_via_file_annotator.prototype._zoom_activate = function() {
-  this.zoom_container.innerHTML = '';
+_via_file_annotator.prototype._magnifier_activate = function() {
+  this.magnifier_container.innerHTML = '';
 
   // add filecontent
   var filecontent = this.file_html_element.cloneNode(true);
   filecontent.removeAttribute('style');
   filecontent.removeAttribute('id');
 
-  this.zoom_canvas_width = this.cwidth * this.zoom_scale;
-  this.zoom_canvas_height = this.cheight * this.zoom_scale;
-  filecontent.setAttribute('width', this.zoom_canvas_width);
-  filecontent.setAttribute('height', this.zoom_canvas_height);
+  this.magnifier_canvas_width = this.cwidth * this.magnifier_scale;
+  this.magnifier_canvas_height = this.cheight * this.magnifier_scale;
+  filecontent.setAttribute('width', this.magnifier_canvas_width);
+  filecontent.setAttribute('height', this.magnifier_canvas_height);
 
   var rshape = document.createElement('canvas');
-  rshape.setAttribute('id', 'zoom_region_shape');
-  rshape.width = this.zoom_canvas_width;
-  rshape.height = this.zoom_canvas_height;
-  this.zoom_rshape_ctx = rshape.getContext('2d');
-  this.zoom_rshape_ctx.drawImage(this.rshape_canvas, 0, 0, this.cwidth, this.cheight,
-                                 0, 0, this.zoom_canvas_width, this.zoom_canvas_height);
+  rshape.setAttribute('id', 'magnifier_region_shape');
+  rshape.width = this.magnifier_canvas_width;
+  rshape.height = this.magnifier_canvas_height;
+  this.magnifier_rshape_ctx = rshape.getContext('2d');
+  this.magnifier_rshape_ctx.drawImage(this.rshape_canvas, 0, 0, this.cwidth, this.cheight,
+                                 0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height);
 
   var tempr = document.createElement('canvas');
-  tempr.setAttribute('id', 'zoom_region_input');
-  tempr.width = this.zoom_canvas_width;
-  tempr.height = this.zoom_canvas_height;
-  this.zoom_tempr_ctx = tempr.getContext('2d');
+  tempr.setAttribute('id', 'magnifier_region_input');
+  tempr.width = this.magnifier_canvas_width;
+  tempr.height = this.magnifier_canvas_height;
+  this.magnifier_tempr_ctx = tempr.getContext('2d');
 
-  this.zoom_container.appendChild(filecontent);
-  this.zoom_container.appendChild(rshape);
-  this.zoom_container.appendChild(tempr);
+  this.magnifier_container.appendChild(filecontent);
+  this.magnifier_container.appendChild(rshape);
+  this.magnifier_container.appendChild(tempr);
 
-  // zoom panel position gets updated by _zoom_update_position() on mousemove event
+  // zoom panel position gets updated by _magnifier_update_position() on mousemove event
   // zoom panel content gets updated by _draw()
 }
 
-_via_file_annotator.prototype._zoom_update_position = function() {
-  var zoom_panel_left = this.left_pad + this.last_cx - this.zoom_container.offsetWidth/2;
-  var zoom_panel_top  = this.last_cy - this.zoom_container.offsetHeight/2;
+_via_file_annotator.prototype._magnifier_update_position = function() {
+  var magnifier_panel_left = this.left_pad + this.last_cx - this.magnifier_container.offsetWidth/2;
+  var magnifier_panel_top  = this.last_cy - this.magnifier_container.offsetHeight/2;
 
   // position zoom container
   var style = [];
-//  style.push('width:' + this.conf.ZOOM_SIZE + 'px');
-//  style.push('height:' + this.conf.ZOOM_SIZE + 'px');
-  style.push('top:' + zoom_panel_top + 'px');
-  style.push('left:' + zoom_panel_left + 'px');
-  //style.push('border-radius:' + this.conf.ZOOM_SIZE_BY2 + 'px');
+  style.push('top:' + magnifier_panel_top + 'px');
+  style.push('left:' + magnifier_panel_left + 'px');
   style.push('border-radius:2em;');
-  this.zoom_container.setAttribute('style', style.join(';'));
+  this.magnifier_container.setAttribute('style', style.join(';'));
 
   // position filecontent
   style = [];
   style.push('position: absolute');
-  var scaled_img_left = this.zoom_container.offsetWidth/2 - this.last_cx * this.zoom_scale;
-  var scaled_img_top  = this.zoom_container.offsetHeight/2 - this.last_cy * this.zoom_scale;
+  var scaled_img_left = this.magnifier_container.offsetWidth/2 - this.last_cx * this.magnifier_scale;
+  var scaled_img_top  = this.magnifier_container.offsetHeight/2 - this.last_cy * this.magnifier_scale;
   style.push('top:' + scaled_img_top + 'px');
   style.push('left:' + scaled_img_left + 'px');
-  this.zoom_container.childNodes[0].setAttribute('style', style.join(';'));
-  this.zoom_container.childNodes[1].setAttribute('style', style.join(';'));
-  this.zoom_container.childNodes[2].setAttribute('style', style.join(';'));
+  this.magnifier_container.childNodes[0].setAttribute('style', style.join(';'));
+  this.magnifier_container.childNodes[1].setAttribute('style', style.join(';'));
+  this.magnifier_container.childNodes[2].setAttribute('style', style.join(';'));
 }
 
 _via_file_annotator.prototype._file_load_show_error_page = function() {
@@ -451,11 +447,27 @@ _via_file_annotator.prototype._file_html_element_compute_scale = function() {
   }
 
   var ar = cw0/ch0;
-  var ch = maxh;
+  var ch, cw;
+  var ch = ch0;
   var cw = Math.floor(ar * ch);
-  if ( cw > maxw ) {
+  switch(this.va.zoom_mode) {
+  case _VIA_ZOOM_MODE.FITHEIGHT:
+    ch = maxh;
+    cw = Math.floor(ar * ch);
+    if ( cw > maxw ) {
+      cw = maxw;
+      ch = Math.floor(cw/ar);
+    }
+
+    break;
+  case _VIA_ZOOM_MODE.FITWIDTH:
     cw = maxw;
     ch = Math.floor(cw/ar);
+    break;
+  default:
+    var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+    ch = Math.floor(zoom_scale_value * ch0);
+    cw = Math.floor(ar * ch);
   }
   this.cwidth = cw;
   this.cheight = ch;
@@ -510,10 +522,10 @@ _via_file_annotator.prototype._file_html_element_ready = function() {
   this.c.appendChild(this.tempr_canvas);
 
   // zoom container
-  this.zoom_container = document.createElement('div');
-  this.zoom_container.setAttribute('class', 'zoom_container');
-  this.zoom_container.classList.add('hide');
-  this.c.appendChild(this.zoom_container);
+  this.magnifier_container = document.createElement('div');
+  this.magnifier_container.setAttribute('class', 'magnifier_container');
+  this.magnifier_container.classList.add('hide');
+  this.c.appendChild(this.magnifier_container);
 
   // keyboard and mouse input handlers
   this.input = document.createElement('div');
@@ -568,6 +580,17 @@ _via_file_annotator.prototype._rinput_remove_input_handlers = function() {
 }
 
 _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
+  if ( e.key === 'b' || e.key === 'l' ) {
+    if(e.key === 'b') {
+      this.show_region_shape = !this.show_region_shape;
+    } else {
+      this.show_region_label = !this.show_region_label;
+    }
+    this._creg_clear();
+    this._creg_draw_all();
+    return;
+  }
+  
   if ( e.key === 'n' || e.key === 'p' ) {
     e.preventDefault();
     if(e.key === 'n') {
@@ -575,6 +598,7 @@ _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
     } else {
       this.va.emit_event('view_prev', {});
     }
+    return;
   }
 
   if ( e.key === 'Backspace' || e.key === 'Delete' ) {
@@ -629,14 +653,14 @@ _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
   }
 
   if ( e.key === '-' ) {
-    if(this._is_zoom_enabled) {
-      if(this.zoom_scale_index > 0) {
-        this.zoom_scale_index = this.zoom_scale_index - 1;
-        this.zoom_scale = this.zoom_scale_list[this.zoom_scale_index];
-        _via_util_msg_show('Zoom scale reduced to ' + this.zoom_scale);
-        this.zoom_container.classList.add('hide');
-        this._zoom_activate();
-        this.zoom_container.classList.remove('hide');
+    if(this._is_magnifier_enabled) {
+      if(this.magnifier_scale_index > 0) {
+        this.magnifier_scale_index = this.magnifier_scale_index - 1;
+        this.magnifier_scale = this.magnifier_scale_list[this.magnifier_scale_index];
+        _via_util_msg_show('Zoom scale reduced to ' + this.magnifier_scale);
+        this.magnifier_container.classList.add('hide');
+        this._magnifier_activate();
+        this.magnifier_container.classList.remove('hide');
       } else {
         _via_util_msg_show('Reached minimum limit of zoom');
       }
@@ -644,14 +668,14 @@ _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
   }
 
   if ( e.shiftKey && e.key === '+') {
-    if(this._is_zoom_enabled) {
-      if(this.zoom_scale_index < this.zoom_scale_list.length) {
-        this.zoom_scale_index = this.zoom_scale_index + 1;
-        this.zoom_scale = this.zoom_scale_list[this.zoom_scale_index];
-        _via_util_msg_show('Zoom scale increased to ' + this.zoom_scale);
-        this.zoom_container.classList.add('hide');
-        this._zoom_activate();
-        this.zoom_container.classList.remove('hide');
+    if(this._is_magnifier_enabled) {
+      if(this.magnifier_scale_index < this.magnifier_scale_list.length) {
+        this.magnifier_scale_index = this.magnifier_scale_index + 1;
+        this.magnifier_scale = this.magnifier_scale_list[this.magnifier_scale_index];
+        _via_util_msg_show('Zoom scale increased to ' + this.magnifier_scale);
+        this.magnifier_container.classList.add('hide');
+        this._magnifier_activate();
+        this.magnifier_container.classList.remove('hide');
       } else {
         _via_util_msg_show('Reached maximum limit of zoom');
       }
@@ -908,8 +932,8 @@ _via_file_annotator.prototype._rinput_mouseup_handler = function(e) {
       var cdy = canvas_input_pts[3] - canvas_input_pts[1];
       var mid_list = this.selected_mid_list.slice(0);
       this._metadata_move_region(mid_list, cdx, cdy);
-      if(this._is_zoom_enabled) {
-        this.zoom_rshape_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height); // required to clear old region
+      if(this._is_magnifier_enabled) {
+        this.magnifier_rshape_ctx.clearRect(0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height); // required to clear old region
       }
       this._tmpreg_clear();
       this.user_input_pts = [];
@@ -948,8 +972,8 @@ _via_file_annotator.prototype._rinput_mouseup_handler = function(e) {
                                    cx, cy);
     }
 
-    if(this._is_zoom_enabled) {
-      this.zoom_rshape_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height); // required to clear old region
+    if(this._is_magnifier_enabled) {
+      this.magnifier_rshape_ctx.clearRect(0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height); // required to clear old region
     }
     this._tmpreg_clear();
     this.user_input_pts = [];
@@ -998,8 +1022,8 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
   this.last_cx = cx;
   this.last_cy = cy;
 
-  if(this._is_zoom_enabled) {
-    this._zoom_update_position();
+  if(this._is_magnifier_enabled) {
+    this._magnifier_update_position();
   }
 
   var pts = this.user_input_pts.slice(0);
@@ -1095,15 +1119,15 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
 
 _via_file_annotator.prototype._rinput_mouseout_handler = function(e) {
   e.stopPropagation();
-  if(this._is_zoom_enabled) {
-    this.zoom_container.classList.add('hide');
+  if(this._is_magnifier_enabled) {
+    this.magnifier_container.classList.add('hide');
   }
 }
 
 _via_file_annotator.prototype._rinput_mouseover_handler = function(e) {
   e.stopPropagation();
-  if(this._is_zoom_enabled) {
-    this.zoom_container.classList.remove('hide');
+  if(this._is_magnifier_enabled) {
+    this.magnifier_container.classList.remove('hide');
   }
 }
 
@@ -1581,11 +1605,17 @@ _via_file_annotator.prototype._creg_draw_file_label = function() {
 }
 
 _via_file_annotator.prototype._creg_draw = function(mid) {
-  var is_selected = this.selected_mid_list.includes(mid);
-  this._draw(this.rshapectx, this.creg[mid], is_selected)
+  if(this.show_region_shape) {
+    var is_selected = this.selected_mid_list.includes(mid);
+    this._draw(this.rshapectx, this.creg[mid], is_selected)
+  }
 }
 
 _via_file_annotator.prototype._creg_draw_label = function(mid) {
+  if(!this.show_region_label) {
+    return;
+  }
+  
   if ( this.d.store.metadata[mid].av.hasOwnProperty(this.d.store.config.ui['spatial_region_label_attribute_id']) ) {
     var lx = this.creg[mid][1];
     var ly = this.creg[mid][2];
@@ -2255,8 +2285,8 @@ _via_file_annotator.prototype._tmpreg_move_sel_region_cp = function(mindex, cpin
 
 _via_file_annotator.prototype._tmpreg_clear = function() {
   this.temprctx.clearRect(0, 0, this.tempr_canvas.width, this.tempr_canvas.height);
-  if(this._is_zoom_enabled) {
-    this.zoom_tempr_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height);
+  if(this._is_magnifier_enabled) {
+    this.magnifier_tempr_ctx.clearRect(0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height);
   }
 }
 
@@ -2305,22 +2335,22 @@ _via_file_annotator.prototype._draw = function(ctx, xy, is_selected) {
     }
   }
 
-  if(this._is_zoom_enabled) {
+  if(this._is_magnifier_enabled) {
     var scaled_xy = [ xy[0] ];
     for(var i=1; i<xy.length; ++i) {
-      scaled_xy[i] = xy[i] * this.zoom_scale;
+      scaled_xy[i] = xy[i] * this.magnifier_scale;
     }
     if(ctx.canvas.id === "region_shape") {
-      this._draw(this.zoom_rshape_ctx, scaled_xy, is_selected);
+      this._draw(this.magnifier_rshape_ctx, scaled_xy, is_selected);
       if ( is_selected ) {
         var cp = this._creg_get_control_points(scaled_xy); // cp[0] = shape_id
         var n = cp.length;
         for ( var i = 1; i < n; i = i + 2 ) {
-          this._draw_control_point(this.zoom_rshape_ctx, cp[i], cp[i+1]);
+          this._draw_control_point(this.magnifier_rshape_ctx, cp[i], cp[i+1]);
         }
       }
     } else if(ctx.canvas.id === "region_input") {
-      this._draw(this.zoom_tempr_ctx, scaled_xy, is_selected);
+      this._draw(this.magnifier_tempr_ctx, scaled_xy, is_selected);
     }
   }
 }
@@ -3006,4 +3036,60 @@ _via_file_annotator.prototype._metadata_attribute_io_html_element = function(mid
   el.setAttribute('data-mid', mid);
   el.setAttribute('data-aid', aid);
   return el;
+}
+
+//
+// zoom
+//
+_via_file_annotator.prototype._zoom_in = function() {
+  if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
+     this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
+    this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
+    this.va.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+    _via_util_msg_show('Showing original size');
+  } else {
+    var next_zoom_scale_index = this.va.zoom_scale_value_index + 1;
+    if(next_zoom_scale_index === _VIA_ZOOM_SCALE_VALUE_LIST.length) {
+      _via_util_msg_show('Cannot zoom in any further');
+      return;
+    }
+    this.va.zoom_scale_value_index = next_zoom_scale_index;
+    var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+    _via_util_msg_show('Showing at zoom level of ' + zoom_scale_value + 'X');
+  }
+  this.va.view_show(this.vid);
+}
+
+_via_file_annotator.prototype._zoom_out = function() {
+  if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
+     this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
+    this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
+    this.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+  } else {
+    if(this.va.zoom_scale_value_index === 0) {
+      _via_util_msg_show('Cannot zoom out any further');
+      return;
+    }
+    this.va.zoom_scale_value_index = this.va.zoom_scale_value_index - 1;
+    var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+    _via_util_msg_show('Showing at zoom level of ' + zoom_scale_value + 'X');
+  }
+  this.va.view_show(this.vid);
+}
+
+
+_via_file_annotator.prototype._zoom_fit_screen = function() {
+  switch(this.va.zoom_mode) {
+  case _VIA_ZOOM_MODE.FITHEIGHT:
+    this.va.zoom_mode = _VIA_ZOOM_MODE.FITWIDTH;
+    _via_util_msg_show('Scaled image to fill screen width');
+    break;
+  case _VIA_ZOOM_MODE.FITWIDTH:
+    this.va.zoom_mode = _VIA_ZOOM_MODE.FITHEIGHT;
+    _via_util_msg_show('Scaled image to fill screen height');
+    break;
+  default:
+    this.va.zoom_mode = _VIA_ZOOM_MODE.FITHEIGHT;
+  }
+  this.va.view_show(this.vid);
 }

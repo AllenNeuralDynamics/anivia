@@ -10,7 +10,7 @@ html, body { margin:0; padding:0; box-sizing:border-box; font-family:Sans; font-
 
 *, *:before, *:after { box-sizing:inherit; outline:none; }
 
-.via_container { position:relative; display:grid; grid-template-rows:auto 1fr; grid-row-gap:0.5em; padding:0.3em; background-color:#ffffff; height:100vh; max-height:100vh; width:100vw; }
+.via_container { position:relative; display:grid; grid-template-rows:auto 1fr; grid-row-gap:0.5em; padding:0.3em; background-color:#ffffff; height:100vh; width:100vw; }
 
 /* top control panel */
 #via_control_panel_container { display:block; border:1px solid #707070; padding:0.4em 0.5em; }
@@ -20,8 +20,8 @@ html, body { margin:0; padding:0; box-sizing:border-box; font-family:Sans; font-
 #via_control_panel_container #region_info_panel { font-size:0.8em; }
 #via_control_panel_container .logo { position:relative; display:inline-block; font-size:large; top:0px; }
 #via_control_panel_container .logo a { text-decoration:none; }
-#via_control_panel_container select { background-color:inherit; border:1px solid #cfcfcf; width:17.5em; }
-#via_control_panel_container input { background-color:inherit; border:1px solid #cfcfcf; width:4em;}
+#via_control_panel_container select { background-color:inherit; border:1px solid #cfcfcf; }
+#via_control_panel_container input { background-color:inherit; border:1px solid #cfcfcf; }
 #via_control_panel_container #via_project_name_input { display:inline-block; font-size:small; width:11.5em; border:none; border-bottom:1px solid #cfcfcf; }
 #via_control_panel_container #via_project_name_input:hover { border-bottom:1px solid #cfcfcf; background-color:#f2f2f2; }
 #via_control_panel_container #via_project_name_input:focus { background-color:#f2f2f2; border-bottom:1px solid #cfcfcf; }
@@ -51,7 +51,7 @@ html, body { margin:0; padding:0; box-sizing:border-box; font-family:Sans; font-
 #view_container > .view_content_container > .file_container > .error_page table { border-collapse:collapse; border:1px solid #cccccc;  width:40em;}
 #view_container > .view_content_container > .file_container > .error_page td { padding:0.4em 1em; border:1px solid #cccccc; }
 
-#view_container > .view_content_container > .file_container > .zoom_container { position:absolute; overflow:hidden; border:2px solid red; width:30em; height:30em; }
+#view_container > .view_content_container > .file_container > .magnifier_container { position:absolute; overflow:hidden; border:2px solid red; width:30em; height:30em; }
 
 /* metadata associated with a view */
 #view_container > .view_metadata_container { padding:0.2em; border:1px solid #666666; }
