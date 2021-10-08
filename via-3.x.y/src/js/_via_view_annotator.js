@@ -604,10 +604,12 @@ _via_view_annotator.prototype._on_event_keydown = function(e) {
     if ( this.view_mode === _VIA_VIEW_MODE.IMAGE1 ) {
       this.file_annotator[0][0]._rinput_keydown_handler(e);
     } else {
-      if ( e.key === 'ArrowRight' ) {
-        this.emit_event('view_next', {});
-      } else {
-        this.emit_event('view_prev', {});
+      if ( e.key === 'ArrowRight' || e.key === 'ArrowLeft' ) {
+        if(e.key === 'ArrowRight') {
+          this.emit_event('view_next', {});
+        } else {
+          this.emit_event('view_prev', {});
+        }
       }
     }
     return;
