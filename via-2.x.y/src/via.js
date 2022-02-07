@@ -4965,7 +4965,12 @@ function img_fn_list_onpresetfilter_select() {
   }
 }
 
-function filter_selected_region_attribute(selected_attribute) {
+function filter_selected_region_attribute(property_entry) {
+  const propArray = property_entry.split("=");
+  if ( propArray.length != 2 || propArray[0] === "" || propArray[1] === "") return;
+  var selected_attribute = propArray[0];
+  var selected_value = propArray[1];
+  
   _via_img_fn_list_html = [];
   _via_img_fn_list_img_index_list = [];
   _via_img_fn_list_html.push('<ul>');
@@ -4980,7 +4985,7 @@ function filter_selected_region_attribute(selected_attribute) {
 
       for ( idx = 0; idx < _via_img_metadata[img_id].regions.length; ++idx ) {
         if ( _via_img_metadata[img_id].regions[idx].region_attributes.hasOwnProperty(selected_attribute) ) {
-          if ( JSON.stringify(_via_img_metadata[img_id].regions[idx].region_attributes[selected_attribute]) === JSON.stringify("1") ) {
+          if ( JSON.stringify(_via_img_metadata[img_id].regions[idx].region_attributes[selected_attribute]) === JSON.stringify(selected_value) ) {
             add_to_list = true;
             _via_img_fn_list_html.push( img_fn_list_ith_entry_html(i) );
             _via_img_fn_list_img_index_list.push(i);
