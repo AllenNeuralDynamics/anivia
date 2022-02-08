@@ -4970,6 +4970,7 @@ function filter_selected_region_attribute(property_entry) {
   if ( propArray.length != 2 || propArray[0] === "" || propArray[1] === "") return;
   var selected_attribute = propArray[0];
   var selected_value = propArray[1];
+  if ( selected_value === "\"\"") selected_value = "";
   
   _via_img_fn_list_html = [];
   _via_img_fn_list_img_index_list = [];
