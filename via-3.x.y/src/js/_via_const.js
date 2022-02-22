@@ -16,5 +16,5 @@ var _VIA_MERGE_STRATEGY = { 'THREE_WAY':1 }
 // zoom, used in _via_control_panel.js to populate a dropdown of zoom options
 var _VIA_ZOOM_MODE = {'FITHEIGHT':1, 'FITWIDTH':2, 'SCALE':3};
 var _VIA_DEFAULT_ZOOM_MODE = _VIA_ZOOM_MODE.FITHEIGHT;
-var _VIA_ZOOM_SCALE_VALUE_LIST = [0.2, 0.5, 0.8, 1.0, 2.0, 4.0, 8.0];
-var _VIA_ZOOM_SCALE_DEFAULT_INDEX = 3;
+var _VIA_ZOOM_SCALE_VALUE_LIST = [0.01, 0.1, 0.2, 0.5, 0.8, 1.0, 2.0, 4.0, 8.0, 10.0];
+var _VIA_ZOOM_SCALE_DEFAULT_INDEX = 5;

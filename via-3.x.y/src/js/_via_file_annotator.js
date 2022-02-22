@@ -580,7 +580,8 @@ _via_file_annotator.prototype._rinput_remove_input_handlers = function() {
 }
 
 _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
-  if ( e.key === 'b' || e.key === 'l' ) {
+  if ( !e.ctrlKey && (e.key === 'b' || e.key === 'l') ) {
+    e.preventDefault();
     if(e.key === 'b') {
       this.show_region_shape = !this.show_region_shape;
     } else {
@@ -652,34 +653,41 @@ _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
     return;
   }
 
-  if ( e.key === '-' ) {
-    if(this._is_magnifier_enabled) {
-      if(this.magnifier_scale_index > 0) {
-        this.magnifier_scale_index = this.magnifier_scale_index - 1;
-        this.magnifier_scale = this.magnifier_scale_list[this.magnifier_scale_index];
-        _via_util_msg_show('Zoom scale reduced to ' + this.magnifier_scale);
-        this.magnifier_container.classList.add('hide');
-        this._magnifier_activate();
-        this.magnifier_container.classList.remove('hide');
+  if (!e.ctrlKey && (e.key === 'm' || (e.shiftKey && e.key === 'M'))) {
+    e.preventDefault();
+
+    if(e.key === 'm') {
+      this._magnifier_toggle();
+    } else {
+      // cycle through different level of magnification
+      if((this.magnifier_scale_index + 1) === this.magnifier_scale_list.length) {
+        this.magnifier_scale_index = 0;
       } else {
-        _via_util_msg_show('Reached minimum limit of zoom');
+        this.magnifier_scale_index = this.magnifier_scale_index + 1;
       }
+      this.magnifier_scale = this.magnifier_scale_list[this.magnifier_scale_index];
+      _via_util_msg_show('Magnification changed to ' + this.magnifier_scale);
+      this.magnifier_container.classList.add('hide');
+      this._magnifier_activate();
+      this.magnifier_container.classList.remove('hide');
     }
+    return;
   }
 
-  if ( e.shiftKey && e.key === '+') {
-    if(this._is_magnifier_enabled) {
-      if(this.magnifier_scale_index < this.magnifier_scale_list.length) {
-        this.magnifier_scale_index = this.magnifier_scale_index + 1;
-        this.magnifier_scale = this.magnifier_scale_list[this.magnifier_scale_index];
-        _via_util_msg_show('Zoom scale increased to ' + this.magnifier_scale);
-        this.magnifier_container.classList.add('hide');
-        this._magnifier_activate();
-        this.magnifier_container.classList.remove('hide');
-      } else {
-        _via_util_msg_show('Reached maximum limit of zoom');
-      }
+  if ( !e.ctrlKey && (e.key === '-' || e.key === '=' || (e.shiftKey && e.key === '+')) ) {
+    e.preventDefault();
+    switch(e.key) {
+    case '=':
+      this._zoom_reset();
+      break;
+    case '+':
+      this._zoom_in();
+      break;
+    case '-':
+      this._zoom_out();
+      break;
     }
+    return;
   }
 
   if ( e.key === 'Escape' ) {
@@ -3064,7 +3072,7 @@ _via_file_annotator.prototype._zoom_out = function() {
   if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
      this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
     this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
-    this.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+    this.va.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
   } else {
     if(this.va.zoom_scale_value_index === 0) {
       _via_util_msg_show('Cannot zoom out any further');
@@ -3077,6 +3085,16 @@ _via_file_annotator.prototype._zoom_out = function() {
   this.va.view_show(this.vid);
 }
 
+_via_file_annotator.prototype._zoom_reset = function() {
+  if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
+     this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
+    this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
+  }
+  this.va.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+  var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+  _via_util_msg_show('Showing at zoom level of ' + zoom_scale_value + 'X');
+  this.va.view_show(this.vid);
+}
 
 _via_file_annotator.prototype._zoom_fit_screen = function() {
   switch(this.va.zoom_mode) {
