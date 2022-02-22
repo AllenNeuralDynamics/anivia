@@ -6,7 +6,9 @@ var _via_dp = []; // debug project
 _via_dp[0] = {};
 _via_dp[0]['store'] = {};
 _via_dp[0]['store']['project'] = {
-  'pid':     'via063e89ef22e548dd92d781fa9f9d089b',
+  'pid': '__VIA_PROJECT_ID__',
+  'rev': '__VIA_PROJECT_REV_ID__',
+  'rev_timestamp': '__VIA_PROJECT_REV_TIMESTAMP__',
   'pname':   'VIA Debug Project',
   'creator': 'VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via)',
   'created': Date.now(),
@@ -14,7 +16,12 @@ _via_dp[0]['store']['project'] = {
 };
 _via_dp[0]['store']['config'] = {
   'file': {
-    'path':'/data/datasets/via/via-3.x.y/speaker_diarisation/',
+    'loc_prefix': {
+      '1':'/data/datasets/via/via-3.x.y/speaker_diarisation/',
+      '2':'',
+      '3':'',
+      '4':'',
+    },
   },
   'ui': {
     'file_content_align':'center'
@@ -189,20 +196,30 @@ _via_dp[0]['store']['metadata'] = {
 _via_dp[1] = {};
 _via_dp[1]['store'] = {};
 _via_dp[1]['store']['project'] = {
-  'pid':     'viab4e012ae255940029e48622064a57e0a',
+  'pid': '__VIA_PROJECT_ID__',
+  'rev': '__VIA_PROJECT_REV_ID__',
+  'rev_timestamp': '__VIA_PROJECT_REV_TIMESTAMP__',
   'pname':   'Audio Annotation',
   'creator': 'VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via)',
   'created': Date.now(),
-  'data_format_version': '3.1.0',
+  'data_format_version': '3.1.1',
+  'vid_list': ['1', '2', '3', '4'],
 };
+
 _via_dp[1]['store']['config'] = {
   'file': {
-    'path':'/data/datasets/via/via-3.x.y/speaker_diarisation/',
+    'loc_prefix': {
+      '1':'',
+      '2':'',
+      '3':'file:///home/tlm/code/via3/via/via-3.x.y/data/sample_audio/',
+      '4':'',
+    },
   },
   'ui': {
     'file_content_align':'center'
   }
 };
+
 _via_dp[1]['store']['attribute'] = {
   '1': {
     'aname':'Speaker',
@@ -237,7 +254,7 @@ _via_dp[1]['store']['file'] = {
     'fid':1,
     'fname':'Drone_liveatc_PRFlyer.mp3',
     'type':8,
-    'loc':1,
+    'loc':3,
     'src':'Drone_liveatc_PRFlyer.mp3',
   },
   '2':{
@@ -279,7 +296,6 @@ _via_dp[1]['store']['view'] = {
   },
 };
 
-_via_dp[1]['store']['vid_list'] = ['1', '2', '3', '4'];
 _via_dp[1]['store']['metadata'] = {
   '-glfwaaX': {
     'vid': '1',
@@ -471,19 +487,29 @@ _via_dp[1]['store']['metadata'] = {
 //
 // human activity
 // source: https://commons.wikimedia.org/wiki/File:Alioli.ogv
-
 _via_dp[2] = {};
 _via_dp[2]['store'] = {};
 _via_dp[2]['store']['project'] = {
-  'pid':     'via81d7a76a8f1d4119abd4766150cdb417',
+//  'pid': '__VIA_PROJECT_ID__',
+//  'rev': '__VIA_PROJECT_REV_ID__',
+  //  'rev_timestamp': '__VIA_PROJECT_REV_TIMESTAMP__',
+  "pid":"71578187-3cd3-45d0-8198-7c441fbc06af",
+  "rev":"1",
+  "rev_timestamp":"1561373349251",
   'pname':   'Video Annotation Project',
   'creator': 'VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via)',
   'created': Date.now(),
-  'data_format_version': '3.1.0',
+  'data_format_version': '3.1.1',
+  'vid_list': ['1', '2', '3'],
 };
 _via_dp[2]['store']['config'] = {
   'file': {
-    'path':'/data/datasets/via/via-3.x.y/activity/',
+    'loc_prefix': {
+      '1':'',
+      '2':'',
+      '3':'file:///home/tlm/data/via/debug/',
+      '4':'',
+    },
   },
   'ui': {
     'file_content_align':'center'
@@ -493,7 +519,7 @@ _via_dp[2]['store']['attribute'] = {
   '1': {
     'aname':'Activity',
     'anchor_id':'FILE1_Z2_XY0',
-    'type':1,
+    'type':4,
     'desc':'Activity',
     'options':{},
     'default_option_id':'',
@@ -532,15 +558,15 @@ _via_dp[2]['store']['attribute'] = {
       '2':'Tool',
       '3':'Unknown',
     },
-    'default_option_id':'3',
-  },
+    'default_option_id':'3'
+  }
 };
 _via_dp[2]['store']['file'] = {
   '1':{
     'fid':1,
     'fname':'Alioli_Wikimedia_Wardtmar.mp4',
     'type':4,
-    'loc':1,
+    'loc':3,
     'src':'Alioli_Wikimedia_Wardtmar.mp4',
   },
   '2':{
@@ -571,7 +597,6 @@ _via_dp[2]['store']['view'] = {
   },
 };
 
-_via_dp[2]['store']['vid_list'] = ['1', '2', '3'];
 _via_dp[2]['store']['metadata'] = {
   '-glfwaaX': {
     'vid': '1',
@@ -603,7 +628,7 @@ _via_dp[2]['store']['metadata'] = {
   'mxCVj1qz': {
     'vid': '1',
     'flg': 0,
-    'z': [32, 63],
+    'z': [32, 44.3],
     'xy': [],
     'av': {
       '1':'3. cut garlic',
@@ -723,15 +748,24 @@ _via_dp[2]['store']['metadata'] = {
 _via_dp[3] = {};
 _via_dp[3]['store'] = {};
 _via_dp[3]['store']['project'] = {
-  'pid':     'via-98785efcfcd44b3cb11a76838b56ac14',
-  'pname':   'MRI Stenosis',
+  'pid': '__VIA_PROJECT_ID__',
+  'rev': '__VIA_PROJECT_REV_ID__',
+  'rev_timestamp': '__VIA_PROJECT_REV_TIMESTAMP__',
+  'pname': 'Demo Pair Annotation',
+  'pdesc': 'Demonstration of annotation of an image pair',
   'creator': 'VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via)',
   'created': Date.now(),
-  'data_format_version': '3.1.0',
+  'data_format_version': '3.1.1',
+  'vid_list': ['1', '2', '3', '4'],
 };
 _via_dp[3]['store']['config'] = {
   'file': {
-    'path':'/data/datasets/via/via-3.x.y/img_pair_annotation/Images/',
+    'loc_prefix': {
+      '1':'',
+      '2':'https://upload.wikimedia.org/wikipedia/commons/thumb/',
+      '3':'',
+      '4':'',
+    },
   },
   'ui': {
     'file_content_align':'center'
@@ -739,98 +773,177 @@ _via_dp[3]['store']['config'] = {
 };
 _via_dp[3]['store']['attribute'] = {
   '1': {
-    'aname': 'central_canal_stenosis',
+    'aname':'beautiful',
     'anchor_id':'FILEN_Z0_XY0',
-    'type': 3,
-    'desc': 'Of the above two images, which has more central canval stenosis?',
-    'options': {
-      '0': 'Image 1',
-      '1': 'Not Sure',
+    'type':3,
+    'desc':'In your opinion, which image is more beautiful?',
+    'options':{
+      '1': 'Image 1',
       '2': 'Image 2',
+      '0': 'Not Sure',
     },
-    'default_option_id': '',
+    'default_option_id':'',
+  },
+  '2': {
+    'aname':'why',
+    'anchor_id':'FILEN_Z0_XY0',
+    'type':1,
+    'desc':'In few words, explain your response',
+    'options':{},
+    'default_option_id':'',
   },
 };
 
 _via_dp[3]['store']['file'] = {
-  '1': {
-    'fid': 1,
-    'fname': 'Normal-SC0917-L3_L4-D20150420.png',
-    'type': 1,
-    'loc': 1,
-    'src': 'Normal-SC0917-L3_L4-D20150420.png',
+  '1':{
+    'fid':1,
+    'fname':'Red-billed oxpecker (Buphagus erythrorhynchus) on impala (Aepyceros melampus).jpg',
+    'type':2,
+    'loc':2,
+    'src':'d/d5/Red-billed_oxpecker_(Buphagus_erythrorhynchus)_on_impala_(Aepyceros_melampus).jpg/320px-Red-billed_oxpecker_(Buphagus_erythrorhynchus)_on_impala_(Aepyceros_melampus).jpg',
   },
-  '2': {
-    'fid': 2,
-    'fname': 'Normal-SC0904-L4_L5-D20090327.png',
-    'type': 1,
-    'loc': 1,
-    'src': 'Normal-SC0904-L4_L5-D20090327.png',
+  '2':{
+    'fid':2,
+    'fname':'Balloon over Luxor - Egypt denoised.jpg',
+    'type':2,
+    'loc':2,
+    'src':'4/41/Balloon_over_Luxor_-_Egypt_denoised.jpg/320px-Balloon_over_Luxor_-_Egypt_denoised.jpg',
   },
-  '3': {
-    'fid': 3,
-    'fname': 'Normal-SC1111-L4_L5-D20090402.png',
-    'type': 1,
-    'loc': 1,
-    'src': 'Normal-SC1111-L4_L5-D20090402.png',
+  '3':{
+    'fid':3,
+    'fname':'Castillo de Montuenga, Montuenga de Soria, Soria, España, 2017-05-23, DD 04.jpg',
+    'type':2,
+    'loc':2,
+    'src':'d/d6/Castillo_de_Montuenga%2C_Montuenga_de_Soria%2C_Soria%2C_España%2C_2017-05-23%2C_DD_04.jpg/320px-Castillo_de_Montuenga%2C_Montuenga_de_Soria%2C_Soria%2C_España%2C_2017-05-23%2C_DD_04.jpg',
   },
-  '4': {
-    'fid': 4,
-    'fname': 'Normal-SC1674-L2_L3-D20110913.png',
-    'type': 1,
-    'loc': 1,
-    'src': 'Normal-SC1674-L2_L3-D20110913.png',
+  '4':{
+    'fid':4,
+    'fname':'Paradise shelduck portrait, New Zealand.jpg',
+    'type':2,
+    'loc':2,
+    'src':'a/ad/Paradise_shelduck_portrait%2C_New_Zealand.jpg/320px-Paradise_shelduck_portrait%2C_New_Zealand.jpg',
   },
-  '5': {
-    'fid': 5,
-    'fname': 'Normal-SC1284-L4_L5-D20080131.png',
-    'type': 1,
-    'loc': 1,
-    'src': 'Normal-SC1284-L4_L5-D20080131.png',
-  }
 };
 
 _via_dp[3]['store']['view'] = {
   '1': {
+    'fid_list': [ 1, 2 ]
+  },
+  '2': {
+    'fid_list': [ 3, 4 ]
+  },
+  '3': {
+    'fid_list': [ 2, 3 ]
+  },
+  '4': {
+    'fid_list': [ 1, 4 ]
+  },
+  // add a view for each file (needed when individual images are annotated)
+  // these views are not visible as they are not present in ['project']['vid_list']
+  '5': { 'fid_list': [1] },
+  '6': { 'fid_list': [2] },
+  '7': { 'fid_list': [3] },
+  '8': { 'fid_list': [4] },
+};
+_via_dp[3]['store']['metadata'] = {};
+
+//
+// Image Annotations
+//
+_via_dp[4] = {};
+_via_dp[4]['store'] = {};
+_via_dp[4]['store']['project'] = {
+  'pid': '__VIA_PROJECT_ID__',
+  'rev': '__VIA_PROJECT_REV_ID__',
+  'rev_timestamp': '__VIA_PROJECT_REV_TIMESTAMP__',
+  'pname':   'Image Annotation',
+  'creator': 'VGG Image Annotator (http://www.robots.ox.ac.uk/~vgg/software/via)',
+  'created': Date.now(),
+  'data_format_version': '3.1.1',
+  'vid_list':['1', '2'],
+};
+_via_dp[4]['store']['config'] = {
+  'file': {
+    'loc_prefix': {
+      '1':'',
+      '2':'',
+      '3':'../../data/sample_img/',
+      '4':'',
+    },
+  },
+  'ui': {
+    'file_content_align':'center'
+  }
+};
+_via_dp[4]['store']['attribute'] = {
+  '1':{
+    'aname':'name',
+    'anchor_id':'FILE1_Z0_XY1',
+    'type': 3,
+    'desc': 'Name of Object',
+    'options': {
+      '0': 'Swan',
+      '1': 'Human',
+      '2': 'Unknown',
+    },
+    'default_option_id': ''
+  },
+  '2': {
+    'aname':'Caption',
+    'anchor_id':'FILE1_Z0_XY0',
+    'type':3,
+    'desc':'Image Caption',
+    'options':{ '1':'a', '2':'b', '3':'c' },
+    'default_option_id':'',
+  },
+};
+
+_via_dp[4]['store']['file'] = {
+  '1': {
+    'fid': 1,
+    'fname': 'adutta_swan.jpg',
+    'type': 2,
+    'loc': 3,
+    'src': 'adutta_swan.jpg',
+  },
+  '2': {
+    'fid': 2,
+    'fname': 'wikimedia_death_of_socrates.jpg',
+    'type': 2,
+    'loc': 3,
+    'src': 'wikimedia_death_of_socrates.jpg',
+  },
+};
+
+_via_dp[4]['store']['view'] = {
+  '1': {
     'fid_list': [
       1,
-      2,
     ]
   },
   '2': {
     'fid_list': [
-      1,
-      3
+      2,
     ]
   },
-  '3': {
-    'fid_list': [
-      1,
-      4,
-    ]
-  },
-  '4': {
-    'fid_list': [
-      1,
-      5,
-    ]
-  },
-  '5': {
-    'fid_list': [1],
-  },
-  '6': {
-    'fid_list': [2],
-  },
-  '7': {
-    'fid_list': [3],
-  },
-  '8': {
-    'fid_list': [4],
-  },
-  '9': {
-    'fid_list': [5],
-  },
-
 };
-_via_dp[3]['store']['vid_list'] = ['1', '2', '3', '4'];
-_via_dp[3]['store']['metadata'] = {};
+_via_dp[4]['store']['metadata'] = {
+  '1_rozl5hQT':{
+    'vid':'1',
+    'flg':0,
+    'z':[],
+    'xy':[2,104.553,119.393,319.056,154.469],
+    'av':{
+      '1':'0',
+    },
+  },
+  '1_n8iiCJ6Y':{
+    'vid':'1',
+    'flg':0,
+    'z':[],
+    'xy':[],
+    'av':{
+      '2':'A white swan in Geneva lake.',
+    },
+  },
+};

@@ -16,7 +16,10 @@ if len(sys.argv) != 2:
 
 TARGET = sys.argv[1]
 TARGET_HTML = os.path.join(VIA_SRC_DIR, 'src', 'html', '_via_' + TARGET + '.html')
-OUT_HTML = os.path.join(VIA_SRC_DIR, 'dist', 'demo', 'via_' + TARGET + '.html')
+DEMO_DIR = os.path.join(VIA_SRC_DIR, 'dist', 'demo',)
+OUT_HTML = os.path.join(DEMO_DIR, 'via_' + TARGET + '.html')
+if not os.path.exists(DEMO_DIR):
+    os.mkdir(DEMO_DIR)
 
 def get_src_file_contents(filename):
   full_filename = os.path.join(VIA_SRC_DIR, 'src', filename)
@@ -73,4 +76,4 @@ with open(OUT_HTML, 'w') as outf:
             parsedline += '<!-- END: Contents of file: ' + TARGET_DEMO_JS_FILENAME + '-->\n'
 
           outf.write(parsedline)
-print("Written packed file to: " + TARGET_HTML)
+print("Written packed file to: " + OUT_HTML)

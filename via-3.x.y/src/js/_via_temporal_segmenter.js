@@ -12,7 +12,9 @@
 
 'use strict';
 
-function _via_temporal_segmenter(container, vid, data, media_element) {
+function _via_temporal_segmenter(file_annotator, container, vid, data, media_element) {
+  this._ID = '_via_temporal_segmenter_';
+  this.fa = file_annotator;
   this.c = container;
   this.vid = vid;
   this.d = data;
@@ -25,7 +27,6 @@ function _via_temporal_segmenter(container, vid, data, media_element) {
   this.selected_gindex = -1;
   this.selected_mindex = -1;
   this.edge_show_time = -1;
-  this.group_default_gid_list = [ ]; // group values added by default
 
   // spatial mid
   this.smid = {};
@@ -34,17 +35,13 @@ function _via_temporal_segmenter(container, vid, data, media_element) {
   this.EDGE_UPDATE_TIME_DELTA = 1/50;  // in sec
   this.TEMPORAL_SEG_MOVE_OFFSET = 1;   // in sec
   this.DEFAULT_TEMPORAL_SEG_LEN = 1;   // in sec
-  this.GTIMELINE_HEIGHT = 4;           // units of char width
+  this.GTIMELINE_HEIGHT = 8;           // units of char width
   this.GTIMELINE_ZOOM_OFFSET = 4;      // in pixels
   this.DEFAULT_WIDTH_PER_SEC = 6;      // units of char width
   this.GID_COL_WIDTH = 15;             // units of char width
   this.METADATA_CONTAINER_HEIGHT = 22; // units of char width
   this.METADATA_EDGE_TOL = 0.1;
   this.GTIMELINE_REGION_MARKER_MOUSE_TOL = 0.1; // in sec.
-
-  this.is_audio_spectrum_enabled = false; //  (DISABLED EXPERIMENTAL FEATURE)
-  this.AUDIO_SPECTRUM_MAX_DURATION = 0; // in sec.
-  this.AUDIO_SPECTRUM_HEIGHT = 15;      // in units of char width
 
   this.PLAYBACK_MODE = { NORMAL:'1', REVIEW_SEGMENT:'2', REVIEW_GAP:'3' };
   this.current_playback_mode = this.PLAYBACK_MODE.NORMAL;
@@ -56,13 +53,20 @@ function _via_temporal_segmenter(container, vid, data, media_element) {
   this.metadata_move_start_x = 0;
   this.metadata_move_dx = 0;
   this.metadata_last_added_mid = '';
+  this.is_init_success = false;
+
+  this.show_audio = false;             // experimental, hence disabled by default
+  this.audio_analyser_active = false;
 
   // registers on_event(), emit_event(), ... methods from
   // _via_event to let this module listen and emit events
-  this._EVENT_ID_PREFIX = '_via_temporal_segmenter_';
   _via_event.call( this );
-  this.d.on_event('attribute_update', this._on_event_attribute_update.bind(this));
-  this.d.on_event('metadata_update_bulk', this._on_event_metadata_update_bulk.bind(this));
+  this.d.on_event('attribute_update', this._ID, this._on_event_attribute_update.bind(this));
+  this.d.on_event('metadata_update_bulk', this._ID, this._on_event_metadata_update_bulk.bind(this));
+  // metadata_add and metadata_update events are captured by
+  // _via_view_annotator.prototype._on_event_metadata_add() and
+  // _via_view_annotator.prototype._on_event_metadata_update()
+  // and passed on to the child temporal_segmenter
 
   if ( ! this.m instanceof HTMLMediaElement ) {
     throw 'media element must be an instance of HTMLMediaElement!';
@@ -78,22 +82,43 @@ function _via_temporal_segmenter(container, vid, data, media_element) {
 }
 
 _via_temporal_segmenter.prototype._init = function() {
+  this.group_aid_candidate_list = [];
+  if ( this.d.cache.attribute_group.hasOwnProperty('FILE1_Z2_XY0') ) {
+    for ( var aindex in this.d.cache.attribute_group['FILE1_Z2_XY0'] ) {
+      this.group_aid_candidate_list.push( this.d.cache.attribute_group['FILE1_Z2_XY0'][aindex] );
+    }
+  }
+  if ( this.d.cache.attribute_group.hasOwnProperty('FILE1_ZN_XYN') ) {
+    for ( var aindex in this.d.cache.attribute_group['FILE1_ZN_XYN'] ) {
+      this.group_aid_candidate_list.push( this.d.cache.attribute_group['FILE1_ZN_XYN'][aindex] );
+    }
+  }
+
+  if ( this.group_aid_candidate_list.length ) {
+    this._init_on_success(this.group_aid_candidate_list[0]);
+    this.is_init_success = true;
+  } else {
+    this._init_on_fail();
+    this.is_init_success = false;
+  }
+}
+
+_via_temporal_segmenter.prototype._init_on_fail = function() {
+  this.c.innerHTML = '<p>You must define an attribute with anchor "Temporal Segment in Video or Audio" in order to define temporal segments in this file. Click&nbsp;<svg class="svg_icon" viewbox="0 0 24 24"><use xlink:href="#micon_insertcomment"></use></svg>&nbsp;button to define such attributes using attribute editor.</p><p>After defining the attribute, <span class="text_button" onclick="via.va.view_show(via.va.vid);">reload this file</span>.' ;
+}
+
+_via_temporal_segmenter.prototype._init_on_success = function(groupby_aid) {
   try {
     this.fid = this.d.store.view[this.vid].fid_list[0];
     this.file = this.d.store.file[this.fid];
 
-    if ( this.d.cache.attribute_group.hasOwnProperty('FILE1_Z2_XY0') ) {
-      var group_aid_list = Object.keys(this.d.cache.attribute_group['FILE1_Z2_XY0']);
-      if ( group_aid_list.length ) {
-        this._group_init( group_aid_list[0]);
-      }
-    }
+    this.c.innerHTML = '';
 
+    this._group_init(groupby_aid);
     if ( this.d.store.file[this.fid].type === _VIA_FILE_TYPE.VIDEO ) {
       this._thumbview_init();
     }
 
-    this._audio_spectrum_init();
     this._vtimeline_init();
     this._tmetadata_init();
     this._toolbar_init();
@@ -139,10 +164,14 @@ _via_temporal_segmenter.prototype._redraw_all = function() {
     }
   }
 
-  this._redraw_timeline();
+  //this._redraw_timeline(); // this is not required
 
   // draw marker to show current time in group timeline and group metadata
   this._tmetadata_draw_currenttime_mark(tnow);
+
+  if(this.show_audio) {
+    this._tmetadata_gtimeline_draw_audio();
+  }
 }
 
 _via_temporal_segmenter.prototype._update_playback_rate = function(t) {
@@ -185,7 +214,7 @@ _via_temporal_segmenter.prototype._thumbview_init = function() {
     this.c.appendChild(this.thumbnail_container);
 
     // initialise thumbnail viewer
-    this.thumbnail = new _via_video_thumbnail(this.file, this.d.store.config.file.path);
+    this.thumbnail = new _via_video_thumbnail(this.fid, this.d);
     this.thumbnail.load();
   }
 }
@@ -259,11 +288,7 @@ _via_temporal_segmenter.prototype._vtimeline_init = function() {
     ctx.lineTo(start, this.lineh - 1);
 
     time = this._vtimeline_canvas2time(start);
-    if ( width_per_sec > width_per_tick ) {
-      ctx.fillText(this._time2strms(time), start, this.linehn[2] - 1);
-    } else {
-      ctx.fillText(this._time2str(time), start, this.linehn[2] - 1);
-    }
+    ctx.fillText(this._time2strms(time), start, this.linehn[2] - 1);
 
     start = start + 10*this.char_width;
   }
@@ -354,7 +379,7 @@ _via_temporal_segmenter.prototype._vtimeline_on_mouseout = function(e) {
 //
 // Metadata Panel
 //
-_via_temporal_segmenter.prototype._tmetadata_init = function(e) {
+_via_temporal_segmenter.prototype._tmetadata_init = function() {
   this.tmetadata_container = document.createElement('div');
   this.tmetadata_container.setAttribute('class', 'tmetadata_container');
 
@@ -365,49 +390,30 @@ _via_temporal_segmenter.prototype._tmetadata_init = function(e) {
   gheader_grid.setAttribute('class', 'twocolgrid');
   var group_aname_container = document.createElement('div');
   group_aname_container.setAttribute('class', 'gidcol');
-  this.group_aname_input = document.createElement('input');
-  this.group_aname_input.setAttribute('type', 'text');
-  this.group_aname_input.setAttribute('style', 'width:80%;');
-  this.group_aname_input.setAttribute('value', this.d.store.attribute[this.groupby_aid].aname);
-  this.group_aname_input.setAttribute('title', 'Using this "timeline group variable", you can create multiple copies of the video timeline. For example, if you want to annotate temporal segments for different speakers in a video, you can use "speaker-id" as the timeline group variable to create a video timeline for each speaker thereby allowing you to annotate each speaker separately.');
-  this.group_aname_input.addEventListener('change', this._tmetadata_onchange_groupby_aname.bind(this));
-  group_aname_container.appendChild(this.group_aname_input);
 
   // group variable selector
-  if ( this.d.cache.attribute_group.hasOwnProperty('FILE1_Z2_XY0') ) {
-    var group_aid_list = Object.keys(this.d.cache.attribute_group['FILE1_Z2_XY0']);
-    if ( group_aid_list.length ) {
-      this.group_aname_select = document.createElement('select');
-      this.group_aname_select.setAttribute('style', 'width:1em; border:none;');
-      this.group_aname_select.setAttribute('tabIndex', '-1')
-      this.group_aname_select.addEventListener('change', this._tmetadata_onchange_groupby_aid.bind(this));
-      for ( var aid in this.d.cache.attribute_group['FILE1_Z2_XY0'] ) {
-        var oi = document.createElement('option');
-        oi.innerHTML = this.d.store.attribute[aid].aname;
-        oi.setAttribute('value', aid);
-        if ( aid === this.groupby_aid ) {
-          oi.setAttribute('selected', '');
-        }
-        this.group_aname_select.appendChild(oi);
+  if ( this.group_aid_candidate_list.length ) {
+    this.group_aname_select = document.createElement('select');
+    this.group_aname_select.setAttribute('title', 'Select the variable name that should be used for temporal segmentation. These variables can be edited using the the attribute editor.');
+    this.group_aname_select.addEventListener('change', this._tmetadata_onchange_groupby_aid.bind(this));
+
+    for ( var aindex in this.group_aid_candidate_list ) {
+      var aid = this.group_aid_candidate_list[aindex];
+      var oi = document.createElement('option');
+      oi.innerHTML = this.d.store.attribute[aid].aname;
+      oi.setAttribute('value', aid);
+      if ( aid === this.groupby_aid ) {
+        oi.setAttribute('selected', '');
       }
-      group_aname_container.appendChild(this.group_aname_select);
+      this.group_aname_select.appendChild(oi);
     }
+    group_aname_container.appendChild(this.group_aname_select);
   }
 
   this.gtimeline_container = document.createElement('div');
   this.gtimeline_container.setAttribute('class', 'gtimeline_container');
   gheader_grid.appendChild(group_aname_container);
   gheader_grid.appendChild(this.gtimeline_container);
-
-  // audio spectrum
-  if ( this.is_audio_spectrum_enabled ) {
-    this.spectrum_label_container = document.createElement('div');
-    this.spectrum_label_container.innerHTML = 'Audio Amplitude';
-    this.spectrum_container = document.createElement('div');
-    this.spectrum_container.setAttribute('class', 'spectrum_container');
-    gheader_grid.appendChild(this.spectrum_label_container);
-    gheader_grid.appendChild(this.spectrum_container);
-  }
 
   gheader_container.appendChild(gheader_grid);
   this.tmetadata_container.appendChild(gheader_container);
@@ -424,6 +430,10 @@ _via_temporal_segmenter.prototype._tmetadata_init = function(e) {
 
   this.gmetadata_container = document.createElement('div');
   this.gmetadata_container.setAttribute('class', 'gmetadata_container');
+
+  var gtimeline_container_maxheight = this.fa.va.gtimeline_container_height - this.METADATA_CONTAINER_HEIGHT + 5; // 5 is offset obtained using visual inspection
+  this.gmetadata_container.setAttribute('style', 'max-height:' + gtimeline_container_maxheight + 'ch;');
+
   this.gmetadata_grid = document.createElement('div');
   this.gmetadata_grid.setAttribute('class', 'twocolgrid');
   this._tmetadata_gmetadata_update();
@@ -434,17 +444,21 @@ _via_temporal_segmenter.prototype._tmetadata_init = function(e) {
   if ( this.gid_list.length ) {
     this._tmetadata_group_gid_sel(0);
   }
+}
 
-  // update audio spectrum
-  if ( this.is_audio_spectrum_enabled ) {
-    this.audio_spectrum._init(this.spectrum_container,
-                              this.timeline_container_width,
-                              this.linehn[this.AUDIO_SPECTRUM_HEIGHT],
-                             );
-    this.audio_spectrum._update(this.tmetadata_gtimeline_tstart,
-                                this.tmetadata_gtimeline_tend,
-                                this.tmetadata_width_per_sec
-                               );
+_via_temporal_segmenter.prototype._tmetadata_audio_init = function() {
+  try {
+    this.audioctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.analyser = this.audioctx.createAnalyser();
+    this.audiosrc = this.audioctx.createMediaElementSource(this.m);
+    this.audiosrc.connect(this.analyser);
+    this.analyser.connect(this.audioctx.destination)
+
+    this.analyser.fftSize = 32;
+    this.audio_data = new Float32Array(this.analyser.frequencyBinCount);
+    this.audio_analyser_active = true;
+  } catch(ex) {
+    this.audio_analyser_active = false;
   }
 }
 
@@ -463,7 +477,14 @@ _via_temporal_segmenter.prototype._tmetadata_gmetadata_update = function() {
     gid_container.setAttribute('class', 'gidcol');
     var gid_input = document.createElement('input');
     gid_input.setAttribute('type', 'text');
-    gid_input.setAttribute('value', gid);
+    if ( this.d.store.attribute[this.groupby_aid].type === _VIA_ATTRIBUTE_TYPE.SELECT &&
+         this.d.store.attribute[this.groupby_aid].options.hasOwnProperty(gid)
+       ) {
+      gid_input.setAttribute('value', this.d.store.attribute[this.groupby_aid].options[gid]);
+    } else {
+      gid_input.setAttribute('value', gid);
+    }
+
     gid_input.setAttribute('title', this.d.store.attribute[this.groupby_aid].aname +
                            ' = ' + gid);
     gid_input.setAttribute('data-gid', gid);
@@ -480,80 +501,22 @@ _via_temporal_segmenter.prototype._tmetadata_gmetadata_update = function() {
   }
 }
 
-_via_temporal_segmenter.prototype._tmetadata_onchange_groupby_aname = function(e) {
-  this.d.attribute_update_aname(this.groupby_aid, this.group_aname_input.value.trim());
+_via_temporal_segmenter.prototype._tmetadata_gid_list_reorder = function(gindex_now, gindex_new) {
+  var new_loc_gid = this.gid_list[gindex_new];
+  this.gid_list[gindex_new] = this.gid_list[gindex_now];
+  this.gid_list[gindex_now] = new_loc_gid;
+  this._tmetadata_gmetadata_update();
 }
 
+
 _via_temporal_segmenter.prototype._tmetadata_onchange_groupby_aid = function(e) {
+  this.group_aname_select.blur(); // remove selection of dropdown
   var new_groupby_aid = e.target.options[e.target.selectedIndex].value;
   this._group_init( new_groupby_aid );
   this._tmetadata_gmetadata_update();
-  this.gid_list_input.value = this.gid_list.join(',');
-  this.group_aname_input.value = this.d.store.attribute[this.groupby_aid].aname;
-}
-
-_via_temporal_segmenter.prototype._tmetadata_onchange_gid_list_input = function(e) {
-  var input_gid_list = this.gid_list_input.value.split(',');
-  if ( _via_util_array_eq(input_gid_list, this.gid_list) ) {
-    _via_util_msg_show('Timeline group variable values remain unchanged!');
-    return;
-  }
-
-  // filter any empty values
-  var new_gid_list = [];
-  var discarded_gid_list = [];
-  for ( var i in input_gid_list ) {
-    if ( input_gid_list[i] === '' ||
-         input_gid_list[i] === ' ' ) {
-      discarded_gid_list.push( input_gid_list[i] );
-    } else {
-      new_gid_list.push( input_gid_list[i].trim() );
-    }
-  }
-
-  if ( discarded_gid_list.length ) {
-    _via_util_msg_show('Discarded following ' + discarded_gid_list.length + ' values: ' +
-                       discarded_gid_list.join(','));
-  }
-
-  // get a list of timeline group variable values that needs to be deleted
-  var del_gid_list = [];
-  for ( var i in this.gid_list ) {
-    if ( new_gid_list.indexOf(this.gid_list[i]) === -1 ) {
-      del_gid_list.push(this.gid_list[i]);
-    }
-  }
-  this._group_del_gid(del_gid_list).then( function(del_mid_list) {
-    this.d.metadata_delete_bulk(this.vid, del_mid_list, false).then( function(ok) {
-      this._group_init(this.groupby_aid);
-      // add the missing gid
-      var gid;
-      for ( var i in new_gid_list ) {
-        gid = new_gid_list[i];
-        if ( ! this.group.hasOwnProperty(gid) ) {
-          this.group[gid] = [];
-          this.gid_list.push(gid);
-        }
-      }
-      this.gid_list = new_gid_list.slice(0); // ensure the order of gid is as set by user
-      this._tmetadata_gmetadata_update();
-      this.gid_list_input.value = this.gid_list.join(',');
-    }.bind(this), function(err) {
-      console.log(err);
-    }.bind(this));
-  }.bind(this), function(err) {
-    console.log(err);
-  }.bind(this));
-
-/*
-  // update selection
-  var selected_gindex = this.gid_list.indexOf(this.selected_gid);
-  var next_gindex = selected_gindex + 1;
-  if ( next_gindex >= this.gid_list.length ) {
-    next_gindex = 0;
-  }
-  this._tmetadata_group_gid_sel(next_gindex);
-  */
+  this._tmetadata_boundary_update(this.tmetadata_gtimeline_tstart)
+  this._tmetadata_group_gid_sel(0);
+  this._tmetadata_gtimeline_draw();
 }
 
 _via_temporal_segmenter.prototype._tmetadata_boundary_move = function(dt) {
@@ -589,7 +552,6 @@ _via_temporal_segmenter.prototype._tmetadata_boundary_update = function(tstart) 
 
     t = t + 1;
     tx = tx + this.tmetadata_width_per_sec;
-    //console.log('t='+t + ',tx=' + tx+', dur='+this.m.duration+',endx='+endx);
   }
   if ( t >= this.m.duration ) {
     this.tmetadata_gtimeline_tend = this.m.duration;
@@ -598,19 +560,9 @@ _via_temporal_segmenter.prototype._tmetadata_boundary_update = function(tstart) 
   }
   this.tmetadata_gtimeline_xend = this.tmetadata_gtimeline_xstart + (this.tmetadata_gtimeline_tend - this.tmetadata_gtimeline_tstart) * this.tmetadata_width_per_sec;
 
-  //console.log(this.tmetadata_gtimeline_xstart+':'+this.tmetadata_gtimeline_tstart+' - ' + this.tmetadata_gtimeline_xend + ':' + this.tmetadata_gtimeline_tend);
-
   // asynchronously pull out the metadata in the current group timeline boundary
   this.tmetadata_gtimeline_mid = {};
   setTimeout( this._tmetadata_boundary_fetch_all_mid.bind(this), 0);
-
-  if ( this.is_audio_spectrum_enabled) {
-    this.audio_spectrum._update(this.tmetadata_gtimeline_tstart,
-                                this.tmetadata_gtimeline_tend,
-                                this.tmetadata_width_per_sec
-                               );
-  }
-
 }
 
 _via_temporal_segmenter.prototype._tmetadata_boundary_fetch_all_mid = function() {
@@ -632,8 +584,7 @@ _via_temporal_segmenter.prototype._tmetadata_boundary_fetch_spatial_mid = functi
   this.smid = {};
   for ( var mindex in this.d.cache.mid_list[this.vid] ) {
     mid = this.d.cache.mid_list[this.vid][mindex];
-    if ( this.d.store.metadata[mid].flg === _VIA_METADATA_FLAG.VISIBLE &&
-         this.d.store.metadata[mid].z.length === 1 &&
+    if ( this.d.store.metadata[mid].z.length === 1 &&
          this.d.store.metadata[mid].xy.length !== 0
        ) {
       time = this.d.store.metadata[mid].z[0].toString();
@@ -646,6 +597,34 @@ _via_temporal_segmenter.prototype._tmetadata_boundary_fetch_spatial_mid = functi
       }
     }
   }
+  this._redraw_timeline();
+}
+
+_via_temporal_segmenter.prototype._tmetadata_boundary_add_spatial_mid = function(mid) {
+  if ( this.d.store.metadata[mid].z.length === 1 &&
+       this.d.store.metadata[mid].xy.length !== 0
+     ) {
+    var time = this.d.store.metadata[mid].z[0].toString();
+    if ( time >= this.tmetadata_gtimeline_tstart &&
+         time <= this.tmetadata_gtimeline_tend ) {
+      if ( ! this.smid.hasOwnProperty(time) ) {
+        this.smid[time] = [];
+      }
+      this.smid[time].push(mid);
+    }
+  }
+}
+
+_via_temporal_segmenter.prototype._tmetadata_boundary_del_spatial_mid = function(mid) {
+  for ( var time in this.smid ) {
+    if ( this.smid[time].length ) {
+      var mindex = this.smid[time].indexOf(mid);
+      if ( mindex !== -1 ) {
+        this.smid[time].splice(mindex, 1);
+        return;
+      }
+    }
+  }
 }
 
 _via_temporal_segmenter.prototype._tmetadata_boundary_fetch_gid_mid = function(gid) {
@@ -654,8 +633,7 @@ _via_temporal_segmenter.prototype._tmetadata_boundary_fetch_gid_mid = function(g
   var mindex, mid, t0, t1;
   for ( mindex in this.group[gid] ) {
     mid = this.group[gid][mindex];
-    if ( this.d.store.metadata[mid].flg === _VIA_METADATA_FLAG.VISIBLE &&
-         this.d.store.metadata[mid].z.length === 2 &&
+    if ( this.d.store.metadata[mid].z.length === 2 &&
          this.d.store.metadata[mid].xy.length === 0
        ) {
       t0 = this.d.store.metadata[mid].z[0];
@@ -716,6 +694,7 @@ _via_temporal_segmenter.prototype._tmetadata_gtimeline_zoomin = function() {
   if ( wps < this.gtimeline.width ) {
     this.tmetadata_width_per_sec = wps;
     this._tmetadata_boundary_update(this.tmetadata_gtimeline_tstart);
+    this._redraw_timeline();
     this._redraw_all();
   }
 }
@@ -725,6 +704,7 @@ _via_temporal_segmenter.prototype._tmetadata_gtimeline_zoomout = function() {
   if ( wps > 1 ) {
     this.tmetadata_width_per_sec = wps;
     this._tmetadata_boundary_update(this.tmetadata_gtimeline_tstart);
+    this._redraw_timeline();
     this._redraw_all();
   }
 }
@@ -776,10 +756,35 @@ _via_temporal_segmenter.prototype._tmetadata_gtimeline_draw = function() {
     this.gtimelinectx.fillStyle = 'black';
     this.gtimelinectx.beginPath();
     for ( var time in this.smid ) {
-      var smarkx = this._tmetadata_gtimeline_time2canvas( parseFloat(time) );
-      this.gtimelinectx.arc(smarkx, this.linehn[2] + 4, 4, 0, 2*Math.PI);
+      if ( this.smid[time].length ) {
+        var smarkx = this._tmetadata_gtimeline_time2canvas( parseFloat(time) );
+        this.gtimelinectx.arc(smarkx, this.linehn[2] + 4, 4, 0, 2*Math.PI);
+      }
     }
     this.gtimelinectx.fill();
+  }
+
+  // the remaining vertical space (at the bottom) is used to draw audio channel amplitude
+  // drawing of audio visualization is triggered by _tmetadata_init() which in
+  // turn continually triggers the _tmetadata_gtimeline_draw_audio() method
+  // in _redraw_all()
+}
+
+_via_temporal_segmenter.prototype._tmetadata_gtimeline_draw_audio = function() {
+  if(!this.m.paused && this.audio_analyser_active) {
+    var x = this._tmetadata_gtimeline_time2canvas(this.m.currentTime);
+    this.analyser.getFloatTimeDomainData(this.audio_data);
+    var avg = 0.0;
+    for(var i=0; i<this.audio_data.length; ++i) {
+      avg += Math.abs(this.audio_data[i]);
+    }
+    avg = avg / this.audio_data.length;
+
+    var max_height = (this.linehn[8] - this.linehn[4]);
+    var y = Math.round( avg * max_height );
+    this.gtimelinectx.fillStyle = '#4d4d4d';
+    this.gtimelinectx.lineWidth = this.DRAW_LINE_WIDTH;
+    this.gtimelinectx.fillRect(x, Math.max(this.linehn[4], this.linehn[6] - y), 2, 2*y);
   }
 }
 
@@ -788,15 +793,17 @@ _via_temporal_segmenter.prototype._tmetadata_draw_currenttime_mark = function(tn
   this.gtimelinectx.fillStyle = '#ffffff';
   this.gtimelinectx.fillRect(0, 0, this.gtimeline.width, this.linehn[2] - 1);
 
-  var markx = this._tmetadata_gtimeline_time2canvas(tnow);
-
-  this.gtimelinectx.fillStyle = 'black';
-  this.gtimelinectx.beginPath();
-  this.gtimelinectx.moveTo(markx, this.linehn[2]);
-  this.gtimelinectx.lineTo(markx - this.linehb2, this.linehn[1]);
-  this.gtimelinectx.lineTo(markx + this.linehb2, this.linehn[1]);
-  this.gtimelinectx.moveTo(markx, this.linehn[2]);
-  this.gtimelinectx.fill();
+  if ( tnow >= this.tmetadata_gtimeline_tstart &&
+       tnow <= this.tmetadata_gtimeline_tend ) {
+    var markx = this._tmetadata_gtimeline_time2canvas(tnow);
+    this.gtimelinectx.fillStyle = 'black';
+    this.gtimelinectx.beginPath();
+    this.gtimelinectx.moveTo(markx, this.linehn[2]);
+    this.gtimelinectx.lineTo(markx - this.linehb2, this.linehn[1]);
+    this.gtimelinectx.lineTo(markx + this.linehb2, this.linehn[1]);
+    this.gtimelinectx.moveTo(markx, this.linehn[2]);
+    this.gtimelinectx.fill();
+  }
 
   // show playback rate
   this.gtimelinectx.font = '10px Sans';
@@ -896,12 +903,10 @@ _via_temporal_segmenter.prototype._tmetadata_group_update_gid = function(e) {
     delete this.group[old_gid];
     var gindex = this.gid_list.indexOf(old_gid);
     this.gid_list[gindex] = new_gid;
-    this.gid_list_input.value = this.gid_list.join(',');
 
     this._tmetadata_gmetadata_update();
     delete this.tmetadata_gtimeline_mid[old_gid];
     this._tmetadata_boundary_fetch_gid_mid(new_gid);
-    console.log(this.tmetadata_gtimeline_mid)
     this._tmetadata_group_gid_draw(new_gid);
 
     // update selection to new_gid
@@ -1233,6 +1238,7 @@ _via_temporal_segmenter.prototype._tmetadata_mid_move = function(dt) {
 _via_temporal_segmenter.prototype._tmetadata_mid_del_sel = function(mid) {
   this._tmetadata_mid_del(this.selected_mid);
   this._tmetadata_group_gid_remove_mid_sel();
+  _via_util_msg_show('Temporal segment deleted.');
 }
 
 _via_temporal_segmenter.prototype._tmetadata_mid_del = function(mid) {
@@ -1241,8 +1247,8 @@ _via_temporal_segmenter.prototype._tmetadata_mid_del = function(mid) {
     this.tmetadata_gtimeline_mid[this.selected_gid].splice(mindex, 1);
 
     this._group_gid_del_mid(this.selected_gid, mid);
-    this.d.metadata_delete(this.vid, mid);
     this._tmetadata_group_gid_draw(this.selected_gid);
+    this.d.metadata_delete(this.vid, mid);
   }
 }
 
@@ -1346,6 +1352,30 @@ _via_temporal_segmenter.prototype._tmetadata_mid_merge = function(eindex) {
   } else {
     _via_util_msg_show('Merge is not possible without temporal segments in the neighbourhood');
   }
+}
+
+_via_temporal_segmenter.prototype._tmetadata_mid_change_gid = function(from_gindex,
+                                                                       to_gindex) {
+  var from_gid = this.gid_list[from_gindex];
+  var to_gid = this.gid_list[to_gindex];
+  var mid_to_move = this.tmetadata_gtimeline_mid[from_gid][this.selected_mindex];
+  var mindex_to_move = this.selected_mindex;
+
+  // update metadata
+  this.d.store.metadata[mid_to_move].av[this.groupby_aid] = to_gid;
+
+  this._tmetadata_group_gid_remove_mid_sel(mindex_to_move);
+  this.tmetadata_gtimeline_mid[from_gid].splice(mindex_to_move, 1);
+  var from_group_mindex = this.group[from_gid].indexOf(mid_to_move);
+  this.group[from_gid].splice(from_group_mindex, 1);
+  this.group[to_gid].push(mid_to_move);
+
+  this.tmetadata_gtimeline_mid[to_gid].push(mid_to_move);
+  this.tmetadata_gtimeline_mid[to_gid].sort( this._compare_mid_by_time.bind(this) );
+  var moved_mindex = this.tmetadata_gtimeline_mid[to_gid].indexOf(mid_to_move);
+
+  this._tmetadata_group_gid_sel(to_gindex);
+  this._tmetadata_group_gid_sel_metadata(moved_mindex);
 }
 
 _via_temporal_segmenter.prototype._tmetadata_group_gid_mousemove = function(e) {
@@ -1483,11 +1513,16 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_get_mindex_at_time = func
 // keyboard input handler
 //
 _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
-  var fid = this.file.fid;
+  if(!this.is_init_success) {
+    return;
+  }
 
   // play/pause
   if ( e.key === ' ' ) {
     e.preventDefault();
+    if( this.show_audio && !this.audio_analyser_active) {
+      this._tmetadata_audio_init();
+    }
     if ( this.m.paused ) {
       this.m.play();
       _via_util_msg_show('Playing ...');
@@ -1495,7 +1530,7 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
       this.m.pause();
       _via_util_msg_show('Paused. Press <span class="key">a</span> to add a temporal segment, ' +
                          '<span class="key">Tab</span> to select and ' +
-                         '<span class="key">&uarr;</span>&nbsp;<span class="key">&darr;</span> to select speaker.', true);
+                         '<span class="key">&uarr;</span>&nbsp;<span class="key">&darr;</span> to select another temporal segment timeline.', true);
     }
   }
 
@@ -1514,6 +1549,23 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
     // clamp
     t = Math.max(0, Math.min(t, this.m.duration));
     this.m.pause();
+    this.m.currentTime = t;
+    return;
+  }
+
+  if ( e.key === 'N' || e.key === 'P') {
+    e.preventDefault();
+    if ( ! this.m.paused ) {
+      return;
+    }
+
+    var t = this.m.currentTime;
+    if ( e.key === 'N') {
+      t = t + this.EDGE_UPDATE_TIME_DELTA * 5;
+    } else {
+      t = t - this.EDGE_UPDATE_TIME_DELTA * 5;
+    }
+    t = Math.max(0, Math.min(t, this.m.duration));
     this.m.currentTime = t;
     return;
   }
@@ -1571,7 +1623,7 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
     return;
   }
 
-  if ( e.key === 'a' || e.key === 'A' ) {
+  if ( (e.key === 'a' || e.key === 'A') && ! e.ctrlKey ) {
     e.preventDefault();
     var t = this.m.currentTime;
     if ( e.key === 'a' ) {
@@ -1653,9 +1705,7 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
   // cancel ongoing action or event
   if ( e.key === 'Escape' ) {
     e.preventDefault();
-
     this._tmetadata_group_gid_remove_mid_sel();
-
     return;
   }
 
@@ -1679,8 +1729,9 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
   }
 
   if ( e.key === 'ArrowDown' || e.key === 'ArrowUp' ) {
-    // update the attribute being shown below each temporal segment
     e.preventDefault();
+
+    // determine the current and new gid
     var selected_gindex = this.gid_list.indexOf(this.selected_gid);
     var next_gindex;
     if ( e.key === 'ArrowDown' ) {
@@ -1694,9 +1745,26 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
         next_gindex = this.gid_list.length - 1;
       }
     }
-    this._tmetadata_group_gid_sel(next_gindex);
-    _via_util_msg_show('Selected group "' + this.selected_gid + '"');
-    return;
+
+    if(e.ctrlKey) {
+      // change the order of timeline entries by moving a timeline
+      // to the position of next/prev timeline
+      this._tmetadata_gid_list_reorder(selected_gindex, next_gindex);
+    } else {
+      // select next/prev timeline or move selected segment to next/prev timeline
+
+      if(this.selected_mindex !== -1 && this.selected_mid !== '') {
+        // move selected temporal segment to the timeline present above/below the current timeline
+        var from_gindex = selected_gindex;
+        var to_gindex = next_gindex;
+        this._tmetadata_mid_change_gid(from_gindex, to_gindex);
+      } else {
+        // selected the group above/below the current group in the timeline list
+        this._tmetadata_group_gid_sel(next_gindex);
+        _via_util_msg_show('Selected group "' + this.selected_gid + '"');
+        return;
+      }
+    }
   }
 
   if ( e.key === 'ArrowLeft' || e.key === 'ArrowRight' ) {
@@ -1723,19 +1791,23 @@ _via_temporal_segmenter.prototype._on_event_keydown = function(e) {
       }
     } else {
       // move temporal seg. timeline
-      var tstart_new;
-      if ( e.key === 'ArrowLeft' ) {
-        if ( e.shiftKey ) {
+      if(e.shiftKey) {
+        // shift visible timeline by 60 sec.
+        if ( e.key === 'ArrowLeft' ) {
           this._tmetadata_boundary_move(-60*this.TEMPORAL_SEG_MOVE_OFFSET);
         } else {
-          this._tmetadata_boundary_move(-this.TEMPORAL_SEG_MOVE_OFFSET);
+          this._tmetadata_boundary_move(60*this.TEMPORAL_SEG_MOVE_OFFSET);
         }
       } else {
-        if ( e.shiftKey ) {
-          this._tmetadata_boundary_move(60*this.TEMPORAL_SEG_MOVE_OFFSET);
+        // shift by 1 frame
+        var t = this.m.currentTime;
+        if ( e.key === 'ArrowLeft' ) {
+          t = t - this.EDGE_UPDATE_TIME_DELTA;
         } else {
-          this._tmetadata_boundary_move(this.TEMPORAL_SEG_MOVE_OFFSET);
+          t = t + this.EDGE_UPDATE_TIME_DELTA;
         }
+        t = Math.max(0, Math.min(t, this.m.duration));
+        this.m.currentTime = t;
       }
     }
     return;
@@ -1759,8 +1831,7 @@ _via_temporal_segmenter.prototype._group_init = function(aid) {
   var mid, avalue;
   for ( var mindex in this.d.cache.mid_list[this.vid] ) {
     mid = this.d.cache.mid_list[this.vid][mindex];
-    if ( this.d.store.metadata[mid].flg === _VIA_METADATA_FLAG.VISIBLE &&
-         this.d.store.metadata[mid].z.length >= 2 &&
+    if ( this.d.store.metadata[mid].z.length >= 2 &&
          this.d.store.metadata[mid].xy.length === 0
        ) {
       if ( this.d.store.metadata[mid].av.hasOwnProperty(this.groupby_aid) ) {
@@ -1773,14 +1844,23 @@ _via_temporal_segmenter.prototype._group_init = function(aid) {
     }
   }
 
-  this.gid_list = Object.keys(this.group).sort();
+  // add possible values for the group variable
+  this.gid_list = [];
+  // if attribute type is select, then add gid from the attribute's options
+  if ( this.d.store.attribute[aid].type === _VIA_ATTRIBUTE_TYPE.SELECT &&
+       Object.keys(this.d.store.attribute[aid].options).length !== 0
+     ) {
+    for ( var gid in this.d.store.attribute[aid].options ) {
+      if ( ! this.group.hasOwnProperty(gid) ) {
+        this.group[gid] = [];
+        this.gid_list.push(gid);
+      }
+    }
+  }
 
-  // add a default groups
-  var gid;
-  for ( var i in this.group_default_gid_list ) {
-    gid = this.group_default_gid_list[i];
-    if ( ! this.group.hasOwnProperty(gid) ) {
-      this.group[gid] = [];
+  // add groups contained in metadata
+  for ( var gid in this.group ) {
+    if ( ! this.gid_list.includes(gid) ) {
       this.gid_list.push(gid);
     }
   }
@@ -1791,11 +1871,32 @@ _via_temporal_segmenter.prototype._group_init = function(aid) {
     this.group[default_gid] = [];
     this.gid_list.push(default_gid);
   }
+  this.gid_list.sort(this._compare_gid.bind(this)); // sort by group-id
 
   // sort each group elements based on time
   var gid;
   for ( gid in this.group ) {
     this.group[gid].sort( this._compare_mid_by_time.bind(this) );
+  }
+}
+
+_via_temporal_segmenter.prototype._compare_gid = function(gid1_str, gid2_str) {
+  var gid1 = parseInt(gid1_str);
+  var gid2 = parseInt(gid2_str);
+  if(isNaN(gid1) || isNaN(gid2)) {
+    // gid are not numbers and therefore sort them as string
+    if(gid1_str < gid2_str) {
+      return -1;
+    } else {
+      return 1;
+    }
+  } else {
+    // gid are numbers and therefore sort them numerically
+    if(gid1 < gid2) {
+      return -1;
+    } else {
+      return 1;
+    }
   }
 }
 
@@ -1959,17 +2060,22 @@ _via_temporal_segmenter.prototype._vtimeline_playbackrate2str = function(t) {
 //
 // external events
 //
-_via_temporal_segmenter.prototype._on_event_metadata_del = function(fid, mid) {
+_via_temporal_segmenter.prototype._on_event_metadata_del = function(vid, mid) {
   _via_util_msg_show('Metadata deleted');
 }
 
-_via_temporal_segmenter.prototype._on_event_metadata_add = function(fid, mid) {
-  this._group_gid_add_mid(this.selected_gid, mid); // add at correct location
-  this._tmetadata_boundary_fetch_gid_mid(this.selected_gid);
-  _via_util_msg_show('Metadata added');
+_via_temporal_segmenter.prototype._on_event_metadata_add = function(vid, mid) {
+  if ( this.vid === vid &&
+       this.d.store.metadata[mid].z.length === 2 &&
+       this.d.store.metadata[mid].xy.length === 0
+     ) {
+    this._group_gid_add_mid(this.selected_gid, mid); // add at correct location
+    this._tmetadata_boundary_fetch_gid_mid(this.selected_gid);
+    _via_util_msg_show('Metadata added');
+  }
 }
 
-_via_temporal_segmenter.prototype._on_event_metadata_update = function(fid, mid) {
+_via_temporal_segmenter.prototype._on_event_metadata_update = function(vid, mid) {
   _via_util_msg_show('Metadata updated');
 }
 
@@ -1997,33 +2103,55 @@ _via_temporal_segmenter.prototype._toolbar_init = function() {
   }
   pb_mode_container.appendChild(pb_mode_select);
 
-  var gid_list_update_container = document.createElement('div');
-  var label = document.createElement('span');
-  label.innerHTML = 'Timeline List: ';
-  gid_list_update_container.appendChild(label);
-
-  this.gid_list_input = document.createElement('input');
-  this.gid_list_input.setAttribute('type', 'text');
-  this.gid_list_input.setAttribute('title', 'Use this input to (a) delete an existing value of timeline group variable; (b) update the order of existing values of the timeline group variable.');
-  var gid_list_str = this.gid_list.join(',');
-  this.gid_list_input.setAttribute('value', gid_list_str);
-  //this.gid_list_input.setAttribute('style', 'width:' + (gid_list_str.length) + 'ch;');
-  this.gid_list_input.setAttribute('style', 'width:15em;');
-  var gid_list_update_btn = document.createElement('button');
-  gid_list_update_btn.innerHTML = 'Update';
-  gid_list_update_btn.addEventListener('click', this._tmetadata_onchange_gid_list_input.bind(this));
-
-  gid_list_update_container.appendChild(this.gid_list_input);
-  gid_list_update_container.appendChild(gid_list_update_btn);
+  var gtimeline_row_count_select = document.createElement('select');
+  gtimeline_row_count_select.setAttribute('title', 'Number of timeline entries visible to the user at any time.');
+  for(var row_count in this.fa.va.GTIMELINE_ROW_HEIGHT_MAP) {
+    var option = document.createElement('option');
+    option.setAttribute('value', row_count);
+    if(row_count === this.d.store['config']['ui']['gtimeline_visible_row_count']) {
+      option.setAttribute('selected', '');
+    }
+    option.innerHTML = row_count;
+    gtimeline_row_count_select.appendChild(option);
+  }
+  gtimeline_row_count_select.addEventListener('change', function(e) {
+    this.d.store['config']['ui']['gtimeline_visible_row_count'] = e.target.options[e.target.selectedIndex].value;
+    this.fa.va.view_show(this.vid);
+  }.bind(this));
+  var gtimeline_height_container = document.createElement('div');
+  gtimeline_height_container.appendChild(gtimeline_row_count_select);
 
   var keyboard_shortcut = document.createElement('span');
   keyboard_shortcut.setAttribute('class', 'text_button');
   keyboard_shortcut.innerHTML = 'Keyboard Shortcuts';
   keyboard_shortcut.addEventListener('click', function() {
-    _via_util_show_info_page('page_keyboard_shortcut');
+    _via_util_page_show('page_keyboard_shortcut');
   });
 
-  this.toolbar_container.appendChild(gid_list_update_container);
+  // tool to add/delete timeline
+  var attrupdate_container = document.createElement('div');
+  var add = document.createElement('button');
+  add.innerHTML = 'Add';
+  add.setAttribute('title', 'Add a new timeline');
+  add.addEventListener('click', this._toolbar_gid_add.bind(this));
+
+  var del = document.createElement('button');
+  del.innerHTML = 'Del';
+  del.setAttribute('title', 'Delete an existing timeline');
+  del.addEventListener('click', this._toolbar_gid_del.bind(this));
+
+  var attrval = document.createElement('input');
+  attrval.setAttribute('class', 'newgid');
+  attrval.setAttribute('id', 'gid_add_del_input');
+  attrval.setAttribute('type', 'text');
+  attrval.setAttribute('title', 'Name of timeline to add or delete');
+  attrval.setAttribute('placeholder', 'add/del ' + this.d.store.attribute[this.groupby_aid].aname);
+  attrupdate_container.appendChild(attrval)
+  attrupdate_container.appendChild(add)
+  attrupdate_container.appendChild(del)
+
+  this.toolbar_container.appendChild(attrupdate_container);
+  this.toolbar_container.appendChild(gtimeline_height_container);
   this.toolbar_container.appendChild(pb_mode_container);
   this.toolbar_container.appendChild(keyboard_shortcut);
 
@@ -2043,39 +2171,62 @@ _via_temporal_segmenter.prototype._toolbar_playback_rate_set = function(rate) {
   }
 }
 
+_via_temporal_segmenter.prototype._toolbar_gid_add = function() {
+  var new_gid = document.getElementById('gid_add_del_input').value.trim();
+  if(new_gid === '') {
+    _via_util_msg_show('Name of new timeline cannot be empty. Enter the name of new timeline in the input panel.');
+    return;
+  }
+  if ( this.group.hasOwnProperty(new_gid) ) {
+    _via_util_msg_show('Timeline [' + new_gid + '] already exists!');
+    return;
+  }
+
+  this.group[new_gid] = [];
+  this.gid_list.push(new_gid);
+  this._tmetadata_gmetadata_update();
+  document.getElementById('gid_add_del_input').value = '';
+}
+
+_via_temporal_segmenter.prototype._toolbar_gid_del = function() {
+  var del_gid = document.getElementById('gid_add_del_input').value.trim();
+  if(del_gid === '') {
+    _via_util_msg_show('To delete, you must provide the name of an existing timeline.');
+    return;
+  }
+
+  if(!this.gid_list.includes(del_gid)) {
+    _via_util_msg_show('Timeline [' + del_gid + '] does not exist and therefore deletion is not possible');
+    return;
+  }
+
+  var del_gid_list = [del_gid];
+  this._group_del_gid(del_gid_list).then( function(del_mid_list) {
+    this.d.metadata_delete_bulk(this.vid, del_mid_list, false).then( function(ok) {
+      this._tmetadata_gmetadata_update();
+      document.getElementById('gid_add_del_input').value = '';
+      _via_util_msg_show('Deleted timeline ' + JSON.stringify(del_gid_list) + ' and ' + del_mid_list.length + ' metadata associated with this timeline.');
+    }.bind(this), function(err) {
+      _via_util_msg_show('Failed to delete ' + del_mid_list.length + ' metadata associated with timeline ' + JSON.stringify(del_gid_list));
+    }.bind(this));
+  }.bind(this), function(err) {
+    _via_util_msg_show('Failed to delete timeline ' + JSON.stringify(del_gid_list));
+  }.bind(this));
+}
+
 //
 // external events
 //
 _via_temporal_segmenter.prototype._on_event_attribute_update = function(data, event_payload) {
   var aid = event_payload.aid;
   if ( this.groupby_aid === aid ) {
-    _via_util_msg_show('Attribute name updated to [' + event_payload.aname + ']');
+    _via_util_msg_show('Attribute [' + this.d.store['attribute'][aid]['aname'] + '] updated.');
+    this._init();
   }
 }
 
 _via_temporal_segmenter.prototype._on_event_metadata_update_bulk = function(data, event_payload) {
   if ( this.vid === event_payload.vid ) {
     _via_util_msg_show('Updated ' + event_payload.mid_list.length + ' metadata');
-  }
-}
-
-//
-// Audio Spectrum
-//
-_via_temporal_segmenter.prototype._audio_spectrum_init = function() {
-  if ( this.m.duration <= this.AUDIO_SPECTRUM_MAX_DURATION &&
-       this.file.type === _VIA_FILE_TYPE.AUDIO &&
-       this.file.loc === _VIA_FILE_LOC.URIHTTP
-     ) {
-    this.audio_spectrum = new _via_audio_spectrum(this.file, this.d.store.config.file.path);
-    this.audio_spectrum.load().then( function(ok) {
-      console.log('load done');
-      this.audio_spectrum._update(this.tmetadata_gtimeline_tstart,
-                                  this.tmetadata_gtimeline_tend,
-                                  this.tmetadata_width_per_sec
-                                 );
-    }.bind(this), function(err) {
-      console.log('load error' + err);
-    }.bind(this));
   }
 }

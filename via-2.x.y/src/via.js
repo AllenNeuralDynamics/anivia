@@ -4880,28 +4880,43 @@ function update_img_fn_list() {
       img_fn_list_onpresetfilter_select();
     }
   } else {
-    img_fn_list_generate_html(regex);
-    img_fn_list.innerHTML = _via_img_fn_list_html.join('');
-    img_fn_list_scroll_to_current_file();
+    if ( p.selectedIndex === 6 ) {
+      // Filter By Region Attribute
+      filter_selected_region_attribute(regex);
+    } else {
+      // RegExp
+      img_fn_list_generate_html(regex);
+      img_fn_list.innerHTML = _via_img_fn_list_html.join('');
+      img_fn_list_scroll_to_current_file();
+    }
   }
 }
 
 function img_fn_list_onregex() {
   var regex = document.getElementById('img_fn_list_regex').value;
+  var p = document.getElementById('filelist_preset_filters_list');
+
+  if ( p.selectedIndex === 6 ) {
+    filter_selected_region_attribute(regex);
+    return;
+  }
+  
   img_fn_list_generate_html( regex );
   img_fn_list.innerHTML = _via_img_fn_list_html.join('');
   img_fn_list_scroll_to_current_file();
 
-  // select 'regex' in the predefined filter list
-  var p = document.getElementById('filelist_preset_filters_list');
+  // select 'regex' in the predefined filter list ( Unless Filter By Attribute is Selected)
   if ( regex === '' ) {
     p.selectedIndex = 0;
   } else {
-    var i;
-    for ( i=0; i<p.options.length; ++i ) {
-      if ( p.options[i].value === 'regex' ) {
-        p.selectedIndex = i;
-        break;
+    if ( p.options[p.selectedIndex].value != 'files_region_attribute' && 
+         p.options[p.selectedIndex].value != 'regex' ) {
+      var i;
+      for ( i=0; i<p.options.length; ++i) {
+        if ( p.options[i].value === 'regex' ) {
+          p.selectedIndex = i;
+          break;
+        }
       }
     }
   }
@@ -4918,6 +4933,11 @@ function img_fn_list_onpresetfilter_select() {
     img_fn_list_scroll_to_current_file();
     break;
   case 'regex':
+    img_fn_list_onregex();
+    document.getElementById('img_fn_list_regex').focus();
+    break;
+  case 'files_region_attribute':
+    img_fn_list_onregex();
     document.getElementById('img_fn_list_regex').focus();
     break;
   default:
@@ -4959,6 +4979,42 @@ function img_fn_list_onpresetfilter_select() {
     img_fn_list_scroll_to_current_file();
     break;
   }
+}
+
+function filter_selected_region_attribute(property_entry) {
+  const propArray = property_entry.split("=");
+  if ( propArray.length != 2 || propArray[0] === "" || propArray[1] === "") return;
+  var selected_attribute = propArray[0];
+  var selected_value = propArray[1];
+  if ( selected_value === "\"\"") selected_value = "";
+  
+  _via_img_fn_list_html = [];
+  _via_img_fn_list_img_index_list = [];
+  _via_img_fn_list_html.push('<ul>');
+
+  if ( _via_attributes.region.hasOwnProperty(selected_attribute) ) {
+    var i;
+
+    for ( i=0; i < _via_image_filename_list.length; ++i ) {
+      var img_id = _via_image_id_list[i];
+      var add_to_list = false;
+      var idx;
+
+      for ( idx = 0; idx < _via_img_metadata[img_id].regions.length; ++idx ) {
+        if ( _via_img_metadata[img_id].regions[idx].region_attributes.hasOwnProperty(selected_attribute) ) {
+          if ( JSON.stringify(_via_img_metadata[img_id].regions[idx].region_attributes[selected_attribute]) === JSON.stringify(selected_value) ) {
+            add_to_list = true;
+            _via_img_fn_list_html.push( img_fn_list_ith_entry_html(i) );
+            _via_img_fn_list_img_index_list.push(i);
+            break;
+          }
+        }
+      }
+    }
+  }
+  _via_img_fn_list_html.push('</ul>');
+  img_fn_list.innerHTML = _via_img_fn_list_html.join('');
+  img_fn_list_scroll_to_current_file();
 }
 
 function is_region_annotation_missing(img_id) {

@@ -10,20 +10,17 @@
 'use strict'
 
 function _via(via_container) {
+  this._ID = '_via';
+
   console.log('Initializing VGG Image Annotator (VIA) version ' + _VIA_VERSION)
   this.via_container = via_container;
 
   this.d  = new _via_data();
+  var conf = { 'ENDPOINT': _VIA_REMOTE_STORE };
+  this.s  = new _via_share(this.d, conf);
 
-  // debug code (disabled for release)
-  if ( false ) {
-    this.d.store = _via_dp[2]['store'];
-    this.d._cache_update();
-
-    setTimeout( function() {
-      this.va.view_show('1');
-      //this.editor.show();
-    }.bind(this), 200);
+  if ( typeof(_VIA_DEBUG) === 'undefined' || _VIA_DEBUG === true ) {
+    // ADD DEBUG CODE HERE (IF NEEDED)
   }
 
   //// define the html containers
@@ -50,6 +47,8 @@ function _via(via_container) {
   this.via_container.appendChild(this.message_container);
 
   //// initialise content creators and managers
+  this.ie = new _via_import_export(this.d);
+
   this.va = new _via_view_annotator(this.d, this.view_container);
   this.editor = new _via_editor(this.d, this.va, this.editor_container);
 
@@ -58,14 +57,20 @@ function _via(via_container) {
   this.vm._init();
 
   // control panel shows the view_manager_container
-  this.cp = new _via_control_panel(this.control_panel_container, this.d, this.va, this.vm);
+  this.cp = new _via_control_panel(this.control_panel_container, this);
+  this.cp._set_region_shape('RECTANGLE');
 
   // event handlers for buttons in the control panel
-  this.cp.on_event('region_shape', function(data, event_payload) {
+  this.cp.on_event('region_shape', this._ID, function(data, event_payload) {
     this.va.set_region_draw_shape(event_payload.shape);
   }.bind(this));
-  this.cp.on_event('editor_toggle', function(data, event_payload) {
+  this.cp.on_event('editor_toggle', this._ID, function(data, event_payload) {
     this.editor.toggle();
+  }.bind(this));
+  this.cp.on_event('zoom_toggle', this._ID, function(data, event_payload) {
+    if(this.va.view_mode === _VIA_VIEW_MODE.IMAGE1) {
+      this.va.file_annotator[0][0]._zoom_toggle();
+    }
   }.bind(this));
 
   // keyboard event handlers
@@ -74,8 +79,8 @@ function _via(via_container) {
   window.addEventListener('keydown', this._keydown_handler.bind(this)); // @todo: should be attached only to VIA application container
 
   // update VIA version number
-  var el = document.getElementById('via_info_page_container');
-  var pages = el.getElementsByClassName('info_page');
+  var el = document.getElementById('via_page_container');
+  var pages = el.getElementsByClassName('via_page');
   var n = pages.length;
   for ( var i = 0; i < n; ++i ) {
     if ( pages[i].dataset.pageid === 'page_about' ) {
@@ -97,7 +102,28 @@ function _via(via_container) {
         err_callback(err);
       }
     }.bind(this));
+  } else {
+    // debug code (disabled for release)
+    if ( typeof(_VIA_DEBUG) === 'undefined' || _VIA_DEBUG === true ) {
+      //this.s.pull(''); // load shared project
+      //this.d.project_load_json(_via_dp[2]['store']); // video
+      //this.d.project_load_json(_via_dp[1]['store']); // audio
+      //this.d.project_load_json(_via_dp[4]['store']); // image
+      //this.d.project_load_json(_via_dp[3]['store']); // pair
+
+      /*
+      setTimeout( function() {
+      //this.va.view_show('1');
+      //this.editor.show();
+      //this.cp._page_show_import_export();
+      //this.cp._share_show_info();
+      }.bind(this), 200);
+      */
+    }
   }
+
+  // ready
+  _via_util_msg_show(_VIA_NAME + ' (' + _VIA_NAME_SHORT + ') ' + _VIA_VERSION + ' ready.');
 }
 
 _via.prototype._hook_on_browser_resize = function() {
@@ -114,4 +140,3 @@ _via.prototype._keydown_handler = function(e) {
     this.va._on_event_keydown(e);
   }
 }
-

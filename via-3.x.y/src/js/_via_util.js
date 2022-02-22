@@ -9,6 +9,8 @@
 'use strict'
 
 var _via_msg_clear_timer; // holds a reference to current message timoout
+var _via_page_current;    // holds a reference to current info page
+var _via_page_action_map; // holds a reference to action map for current info page
 
 function _via_util_get_svg_button(icon_id, title, id) {
   var el = document.createElementNS(_VIA_SVG_NS, 'svg');
@@ -119,11 +121,17 @@ function _via_util_metadata_shape_str(shape_id) {
     case _VIA_WHERE_SHAPE.TIME:
       return 'time';
       break;
-    case _VIA_WHERE_SHAPE.RECT:
-      return 'rect';
+    case _VIA_WHERE_SHAPE.RECTANGLE:
+      return 'rectangle';
+      break;
+    case _VIA_WHERE_SHAPE.EXTREME_RECTANGLE:
+      return 'extreme_rectangle';
       break;
     case _VIA_WHERE_SHAPE.CIRCLE:
       return 'circle';
+      break;
+    case _VIA_WHERE_SHAPE.EXTREME_CIRCLE:
+      return 'extreme_circle';
       break;
     case _VIA_WHERE_SHAPE.ELLIPSE:
       return 'ellipse';
@@ -170,7 +178,7 @@ function _via_util_infer_file_loc_from_filename(filename) {
   if ( filename.startsWith('http://') || filename.startsWith('https://') ) {
     return _VIA_FILE_LOC.URIHTTP;
   } else {
-    if ( filename.startsWith('file://') ) {
+    if ( filename.startsWith('file://') || filename.includes('/') ) {
       return _VIA_FILE_LOC.URIFILE;
     } else {
       return _VIA_FILE_LOC.LOCAL;
@@ -196,6 +204,7 @@ function _via_util_infer_file_type_from_filename(filename) {
   case 'mp3':
   case 'wav':
   case 'oga':
+  case 'ogg':
     return _VIA_FILE_TYPE.AUDIO;
   }
 }
@@ -225,26 +234,29 @@ function _via_util_file_select_local(type, handler, multiple) {
   }
 
   switch(type) {
-  case _VIA_FILE_TYPE.IMAGE:
+  case _VIA_FILE_SELECT_TYPE.IMAGE:
     fsel.accept = 'image/*';
     break;
-  case _VIA_FILE_TYPE.VIDEO:
+  case _VIA_FILE_SELECT_TYPE.VIDEO:
     fsel.accept = 'video/*';
     break;
-  case _VIA_FILE_TYPE.AUDIO:
+  case _VIA_FILE_SELECT_TYPE.AUDIO:
     fsel.accept = 'audio/*';
     break;
-  case _VIA_FILE_TYPE.TEXT:
+  case _VIA_FILE_SELECT_TYPE.TEXT:
     fsel.accept = '.csv,.txt';
     break;
-  case _VIA_FILE_TYPE.JSON:
+  case _VIA_FILE_SELECT_TYPE.JSON:
     fsel.accept = '.json';
     break;
-  case _VIA_FILE_TYPE.VIDEO | _VIA_FILE_TYPE.AUDIO:
+  case _VIA_FILE_SELECT_TYPE.VIDEO | _VIA_FILE_SELECT_TYPE.AUDIO:
     fsel.accept = 'video/*,audio/*';
     break;
-  case _VIA_FILE_TYPE.VIDEO | _VIA_FILE_TYPE.AUDIO | _VIA_FILE_TYPE.IMAGE:
+  case _VIA_FILE_SELECT_TYPE.VIDEO | _VIA_FILE_SELECT_TYPE.AUDIO | _VIA_FILE_SELECT_TYPE.IMAGE:
     fsel.accept = 'video/*,audio/*,image/*';
+    break;
+  case _VIA_FILE_SELECT_TYPE.WEBVTT:
+    fsel.accept = '.vtt';
     break;
   }
 
@@ -257,29 +269,81 @@ function _via_util_rand_int(min_inclusive, max_exclusive) {
   return Math.floor(Math.random() * (max_exclusive - min_inclusive)) + min_inclusive;
 }
 
-function _via_util_show_info_page(page_id) {
-  var el = document.getElementById('via_info_page_container');
+function _via_util_page_show(page_id, action_map) {
+  _via_page_action_map = action_map;
+  var el = document.getElementById('via_page_container');
 
-  var pages = el.getElementsByClassName('info_page');
+  var pages = el.getElementsByClassName('via_page');
   var n = pages.length;
-  var i;
-  for ( i = 0; i < n; ++i ) {
+  for ( var i = 0; i < n; ++i ) {
     if ( pages[i].dataset.pageid === page_id ) {
       pages[i].style.display = 'inline-block';
       el.style.display = 'block';
-      el.addEventListener('mousedown', _via_util_hide_info_page);
+      _via_page_current = pages[i];
     } else {
       pages[i].style.display = 'none';
     }
   }
 }
 
-function _via_util_hide_info_page() {
-  var el = document.getElementById('via_info_page_container');
+function _via_util_page_process_action(e) {
+  for ( var action_id in _via_page_action_map ) {
+    if ( e.target.id === action_id ) {
+      var page_data = _via_util_page_gather_user_input();
+      page_data['_action_id'] = e.target.id;
+      _via_page_action_map[action_id].call(this, page_data);
+      _via_util_page_hide();
+    }
+  }
+}
+
+function _via_util_page_gather_user_input() {
+  var user_input = {};
+
+  // dropdown
+  var select_list = _via_page_current.getElementsByTagName('select');
+  for ( var i = 0; i < select_list.length; ++i ) {
+    user_input[select_list[i].id] = select_list[i].options[ select_list[i].selectedIndex ].value;
+  }
+
+  // input
+  var input_list = _via_page_current.getElementsByTagName('input');
+  for ( var i = 0; i < input_list.length; ++i ) {
+    switch(input_list[i].type) {
+      case 'file':
+        user_input[input_list[i].id] = input_list[i].files;
+        break;
+      case 'select':
+        if ( input_list[i].selectedIndex === -1 ) {
+          user_input[input_list[i].id] = '';
+        } else {
+          user_input[input_list[i].id] = input_list[i].options[input_list[i].selectedIndex];
+        }
+        break;
+      case 'text':
+      case 'password':
+        user_input[input_list[i].id] = input_list[i].value;
+        break;
+      default:
+        console.warn('Input type=' + input_list[i].type + ' not yet implemented!');
+    }
+  }
+
+  // textarea
+  var textarea_list = _via_page_current.getElementsByTagName('textarea');
+  for ( var i = 0; i < textarea_list.length; ++i ) {
+    user_input[textarea_list[i].id] = textarea_list[i].value;
+  }
+
+  return user_input;
+}
+
+function _via_util_page_hide() {
+  var el = document.getElementById('via_page_container');
   if ( el.style.display === 'block' ) {
-    el.removeEventListener('mousedown', _via_util_hide_info_page);
     el.style.display = 'none';
   }
+  _via_page_current = null;
 }
 
 function _via_util_msg_show(msg, sticky) {
@@ -329,10 +393,36 @@ function _via_util_remote_get(uri) {
     xhr.addEventListener('load', function() {
       ok_callback(xhr.responseText);
     });
+    xhr.addEventListener('timeout', function(e) {
+      err_callback(e);
+    });
     xhr.addEventListener('error', function(e) {
       err_callback(e)
     });
     xhr.open('GET', uri);
+    xhr.send();
+  });
+}
+
+function _via_util_remote_head(uri) {
+  return new Promise( function(ok_callback, err_callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.addEventListener('load', function() {
+      switch(xhr.statusText) {
+        case 'OK':
+          ok_callback(xhr.responseText);
+          break;
+        default:
+          err_callback(xhr.statusText);
+      }
+    });
+    xhr.addEventListener('timeout', function(e) {
+      err_callback(e);
+    });
+    xhr.addEventListener('error', function(e) {
+      err_callback(e)
+    });
+    xhr.open('HEAD', uri);
     xhr.send();
   });
 }
@@ -385,8 +475,7 @@ function _via_util_uid6() {
   for ( var i = n - 12; i < n; i = i + 2 ) {
     uuid_suffix_str += String.fromCharCode( parseInt(uuid.substr(i, 2), 16) );
   }
-  var uid = btoa(uuid_suffix_str).replace('/', '-');
-  return uid;
+  return btoa(uuid_suffix_str).replace(/[-+/_]/gi, 'X');
 }
 
 function _via_util_array_eq(a, b) {
@@ -466,4 +555,118 @@ function _via_util_attribute_to_html_element(attr) {
 // see: https://en.wikipedia.org/wiki/Comma-separated_values
 function _via_util_obj2csv(d) {
   return '"' + JSON.stringify(d).replace(/["]/g, '""') + '"';
+}
+
+function _via_util_merge_object(obj1, obj2) {
+  var merged_obj = {};
+  Object.assign(merged_obj, obj1);
+  Object.assign(merged_obj, obj2);
+  return merged_obj;
+}
+
+function _via_util_collect_object_by_keys(object, keys) {
+  var merged_obj = {};
+  for ( var kindex in keys ) {
+    Object.assign(merged_obj, obj1);
+  }
+  Object.assign(merged_obj, obj1);
+  Object.assign(merged_obj, obj2);
+  return merged_obj;
+}
+
+function _via_util_clamp(x, lower_bound, upper_bound) {
+  return Math.min( Math.max(x, lower_bound), upper_bound );
+}
+
+function _via_util_merge_three_way_str(ancestor, version1, version2) {
+  if ( version1 === version2 ) {
+    return version1;
+  } else {
+    if ( ancestor === version1 ) {
+      return version2;
+    } else {
+      return version1;
+    }
+  }
+}
+
+
+function _via_seconds_to_hh_mm_ss_ms(s) {
+  // result = [hh, mm, ss, ms]
+  var result = [0, 0, 0, 0];
+  var sec = parseFloat(s);
+  var ms = parseInt((sec - parseInt(s)) * 1000);
+  if(ms < 99) {
+    if(ms < 9) {
+      result[3] = '00' + ms.toString();
+    } else {
+      result[3] = '0' + ms.toString();
+    }
+  } else {
+    result[3] = ms.toString();
+  }
+
+  if(sec > 60*60) {
+    var hh = parseInt(sec / (60*60));
+    if(hh>9) {
+      result[0] = hh.toString();
+    } else {
+      result[0] = '0' + hh;
+    }
+    sec = sec - result[0] * 60 * 60;
+  } else {
+    result[0] = '00';
+  }
+
+  if(sec > 60) {
+    var mm = parseInt(sec / 60);
+    if(mm>9) {
+      result[1] = mm.toString();
+    } else {
+      result[1] = '0' + mm;
+    }
+    sec = sec - result[1] * 60;
+  } else {
+    result[1] = '00';
+  }
+
+  var ss = parseInt(sec);
+  if(ss>9) {
+    result[2] = ss.toString();
+  } else {
+    result[2] = '0' + ss;
+  }
+
+  return result;
+}
+
+function _via_hh_mm_ss_ms_to_seconds(hh_mm_ss_ms) {
+  // hh_mm_ss_ms = HH:MM:SS.MS
+  var split1 = hh_mm_ss_ms.split('.');
+  if(split1.length !== 2) {
+    split1 = hh_mm_ss_ms.split(',');
+    if(split1.length !== 2) {
+      return -1;
+    }
+  }
+  var split2 = split1[0].split(':');
+  if(split2.length !== 3) {
+    return -1;
+  }
+  var sec = 0;
+  switch(split2.length) {
+  case 3:
+    sec = parseInt(split2[0]) * 60 * 60 + parseInt(split2[1]) * 60 + parseInt(split2[2]);
+    break;
+  case 2:
+    sec = parseInt(split2[1]) * 60 + parseInt(split2[2]);
+    break;
+  case 1:
+    sec = parseInt(split2[2]);
+    break;
+  }
+  if(split1.length === 2) {
+    sec = sec + parseInt(split1[1])/1000;
+  }
+  return sec;
 }
