@@ -2160,7 +2160,9 @@ function _via_reg_canvas_mouseup_handler(e) {
             point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
             point_region.shape_attributes['cx'] = Math.round(_via_click_x0 * _via_canvas_scale);
             point_region.shape_attributes['cy'] = Math.round(_via_click_y0 * _via_canvas_scale);
-            _via_img_metadata[_via_image_id].regions.push(point_region);
+            var region_count = _via_img_metadata[_via_image_id].regions.push(point_region);
+            var new_region_id = region_count - 1;
+            set_region_annotations_to_default_value( new_region_id );
 
             var canvas_point_region = new file_region();
             canvas_point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
