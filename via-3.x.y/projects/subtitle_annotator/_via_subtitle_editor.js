@@ -46,6 +46,9 @@ _via_subtitle_editor.prototype.init = function() {
   var row_index = 1;
   for(var mindex in this.mid_list) {
     var mid = this.mid_list[mindex];
+    if(this.d.store.metadata[mid]['vid'] !== this.ts.vid) {
+      continue; // discard metadata associated with other views
+    }
     var row = this.get_subtitle_table_row(row_index, mindex, mid);
     this.subtitle_tbody.appendChild(row);
 
