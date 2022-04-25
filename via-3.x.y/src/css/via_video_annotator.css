@@ -79,6 +79,13 @@ to annotate temporal segments of a video: contains 4 rows
 .temporal_segmenter_container > .tmetadata_container .gidcol select { font-size:small; }
 .temporal_segmenter_container > .tmetadata_container .gidcol input[type="text"]:focus { background-color:#f2f2f2; }
 
+.temporal_segmenter_container > .tmetadata_container .tseg_metadata_container { display:inline-block; font-size:small; background-color:white; z-index:1001; position:absolute; }
+.temporal_segmenter_container > .tmetadata_container .tseg_metadata_container table { position:relative; border-collapse:collapse; border:none; margin:0.2em; }
+.temporal_segmenter_container > .tmetadata_container .tseg_metadata_container td { vertical-align:middle; border:1px solid #cccccc; padding:0.8em 0.4em; }
+.temporal_segmenter_container > .tmetadata_container .tseg_metadata_container th { vertical-align:middle; border:1px solid #cccccc; padding:0.8em 0.4em; }
+.temporal_segmenter_container > .tmetadata_container .tseg_metadata_container input { font-size:small; }
+.temporal_segmenter_container > .tmetadata_container .tseg_metadata_container select { font-size:small; }
+
 .temporal_segmenter_container > .toolbar_container { font-size:small; vertical-align:middle; margin-top:0.2em;}
 .temporal_segmenter_container > .toolbar_container * { vertical-align:middle; }
 .temporal_segmenter_container > .toolbar_container div { display:inline; }

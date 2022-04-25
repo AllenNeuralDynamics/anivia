@@ -1,6 +1,14 @@
 ## [3.0.X] - not release yet
  * @todo Annotate an ellipse with five clicks on the border (https://gitlab.com/vgg/via/-/issues/279)
 
+## [3.0.11] - 08-October-2021
+ * (subtitle annotator) fixed issue 361 by updating existing video cues instead of adding new ones
+ * attributes of temporal segments can now be updated by selecting a temporal segment
+ * dropdown is empty if no value is selected (before, attributes of type SELECT would wrongly showed the first value as selected)
+ * add/delete vertex of polygon and polyline
+ * added magnifier and zoom for image annotator
+ * keyboard shortcuts b/l added to toggle visibility of region shape boundary and label (same as in via-2.x.y)
+
 ## [3.0.10] - 04-March-2021
  * n/p now maps unambiguously to next/prev file; left/right arrow keys move to prev/next frame
  * improved error log message when file load issue

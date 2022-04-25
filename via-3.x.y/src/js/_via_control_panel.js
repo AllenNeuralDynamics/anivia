@@ -48,12 +48,31 @@ _via_control_panel.prototype._init = function(type) {
 
   this._add_spacer();
 
-  if ( document.getElementById('micon_zoomin') ) {
-    var zoom = _via_util_get_svg_button('micon_zoomin', 'Enable/disable magnifying glass to inspect finer details');
-    zoom.addEventListener('click', function() {
-      this.emit_event( 'zoom_toggle', {});
+  if ( document.getElementById('micon_search') ) {
+    var magnifier = _via_util_get_svg_button('micon_search', 'Enable/disable magnifying glass to inspect finer details');
+    magnifier.addEventListener('click', function() {
+      this.emit_event( 'magnifier_toggle', {}); // control_panel -> view_annotator (bound in _via.js)
     }.bind(this));
-    this.c.appendChild(zoom);
+    this.c.appendChild(magnifier);
+
+    var fit_screen = _via_util_get_svg_button('micon_fit_screen', 'Fit Image to Screen Height or Width');
+    fit_screen.addEventListener('click', function() {
+      this.emit_event( 'fit_screen', {}); // control_panel -> view_annotator (bound in _via.js)
+    }.bind(this));
+    this.c.appendChild(fit_screen);
+
+    var zoomin = _via_util_get_svg_button('micon_zoomin', 'Zoom In');
+    zoomin.addEventListener('click', function() {
+      this.emit_event( 'zoom_in', {}); // control_panel -> view_annotator (bound in _via.js)
+    }.bind(this));
+    this.c.appendChild(zoomin);
+
+    var zoomout = _via_util_get_svg_button('micon_zoomout', 'Zoom Out');
+    zoomout.addEventListener('click', function() {
+      this.emit_event( 'zoom_out', {}); // control_panel -> view_annotator (bound in _via.js)
+    }.bind(this));
+    this.c.appendChild(zoomout);
+
     this._add_spacer();
   }
 

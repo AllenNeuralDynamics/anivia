@@ -36,7 +36,9 @@ function _via_file_annotator(view_annotator, data, vid, file_label, container) {
   this.last_clicked_mid_list = [];
   this.resize_control_point_index = -1;
   this.resize_selected_mid_index = -1;
-
+  this.show_region_shape = true;
+  this.show_region_label = true;
+  
   // canvas regions
   this.creg = {}; // canvas regions
   this.selected_mid_list = [];
@@ -46,11 +48,10 @@ function _via_file_annotator(view_annotator, data, vid, file_label, container) {
   this.last_cy = 0;
 
   // zoom
-  this._is_zoom_enabled = false;
-  this.zoom_scale = 3.0;
-  this.zoom_scale_index = 6;
-  this.zoom_scale_list = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0];
-  // see this.conf.ZOOM_SIZE
+  this._is_magnifier_enabled = false;
+  this.magnifier_scale = 3.0;
+  this.magnifier_scale_index = 6;
+  this.magnifier_scale_list = [0.2, 0.4, 0.6, 0.8, 1.0, 2.0, 3.0, 4.0];
 
   // constants
   this.conf = {};
@@ -73,8 +74,6 @@ function _via_file_annotator(view_annotator, data, vid, file_label, container) {
   this.conf.CROSSHAIR_COLOR1 = '#1a1a1a';
   this.conf.CROSSHAIR_COLOR2 = '#e6e6e6';
   this.conf.SPATIAL_REGION_TIME_TOL = 0.02; // in sec
-  //this.conf.ZOOM_SIZE = 300; // px
-  this.conf.ZOOM_SIZE_BY2 = 150;
 
   // registers on_event(), emit_event(), ... methods from
   // _via_event to let this module listen and emit events
@@ -107,80 +106,77 @@ _via_file_annotator.prototype._init = function() {
   this.fid = this.d.store.view[this.vid].fid_list[0];
 }
 
-_via_file_annotator.prototype._zoom_toggle = function() {
-  if(this._is_zoom_enabled) {
-    this.zoom_container.classList.add('hide');
-    this._is_zoom_enabled = false;
-    this.zoom_container.innerHTML = '';
+_via_file_annotator.prototype._magnifier_toggle = function() {
+  if(this._is_magnifier_enabled) {
+    this.magnifier_container.classList.add('hide');
+    this._is_magnifier_enabled = false;
+    this.magnifier_container.innerHTML = '';
     _via_util_msg_show('Deactivated magnifying glass.');
   } else {
-    this._is_zoom_enabled = true;
-    this._zoom_activate();
-    this.zoom_container.classList.remove('hide');
-    this._zoom_update_position();
+    this._is_magnifier_enabled = true;
+    this._magnifier_activate();
+    this.magnifier_container.classList.remove('hide');
+    this._magnifier_update_position();
     _via_util_msg_show('Activated magnifying glass to allow finer inspection of feature.');
   }
 }
 
-_via_file_annotator.prototype._zoom_activate = function() {
-  this.zoom_container.innerHTML = '';
+_via_file_annotator.prototype._magnifier_activate = function() {
+  this.magnifier_container.innerHTML = '';
 
   // add filecontent
   var filecontent = this.file_html_element.cloneNode(true);
   filecontent.removeAttribute('style');
   filecontent.removeAttribute('id');
 
-  this.zoom_canvas_width = this.cwidth * this.zoom_scale;
-  this.zoom_canvas_height = this.cheight * this.zoom_scale;
-  filecontent.setAttribute('width', this.zoom_canvas_width);
-  filecontent.setAttribute('height', this.zoom_canvas_height);
+  this.magnifier_canvas_width = this.cwidth * this.magnifier_scale;
+  this.magnifier_canvas_height = this.cheight * this.magnifier_scale;
+  filecontent.setAttribute('width', this.magnifier_canvas_width);
+  filecontent.setAttribute('height', this.magnifier_canvas_height);
 
   var rshape = document.createElement('canvas');
-  rshape.setAttribute('id', 'zoom_region_shape');
-  rshape.width = this.zoom_canvas_width;
-  rshape.height = this.zoom_canvas_height;
-  this.zoom_rshape_ctx = rshape.getContext('2d');
-  this.zoom_rshape_ctx.drawImage(this.rshape_canvas, 0, 0, this.cwidth, this.cheight,
-                                 0, 0, this.zoom_canvas_width, this.zoom_canvas_height);
+  rshape.setAttribute('id', 'magnifier_region_shape');
+  rshape.width = this.magnifier_canvas_width;
+  rshape.height = this.magnifier_canvas_height;
+  this.magnifier_rshape_ctx = rshape.getContext('2d');
+  this.magnifier_rshape_ctx.drawImage(this.rshape_canvas, 0, 0, this.cwidth, this.cheight,
+                                 0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height);
 
   var tempr = document.createElement('canvas');
-  tempr.setAttribute('id', 'zoom_region_input');
-  tempr.width = this.zoom_canvas_width;
-  tempr.height = this.zoom_canvas_height;
-  this.zoom_tempr_ctx = tempr.getContext('2d');
+  tempr.setAttribute('id', 'magnifier_region_input');
+  tempr.width = this.magnifier_canvas_width;
+  tempr.height = this.magnifier_canvas_height;
+  this.magnifier_tempr_ctx = tempr.getContext('2d');
 
-  this.zoom_container.appendChild(filecontent);
-  this.zoom_container.appendChild(rshape);
-  this.zoom_container.appendChild(tempr);
+  this.magnifier_container.appendChild(filecontent);
+  this.magnifier_container.appendChild(rshape);
+  this.magnifier_container.appendChild(tempr);
 
-  // zoom panel position gets updated by _zoom_update_position() on mousemove event
+  // zoom panel position gets updated by _magnifier_update_position() on mousemove event
   // zoom panel content gets updated by _draw()
 }
 
-_via_file_annotator.prototype._zoom_update_position = function() {
-  var zoom_panel_left = this.left_pad + this.last_cx - this.zoom_container.offsetWidth/2;
-  var zoom_panel_top  = this.last_cy - this.zoom_container.offsetHeight/2;
+_via_file_annotator.prototype._magnifier_update_position = function() {
+  var magnifier_panel_left = this.left_pad + this.last_cx - this.magnifier_container.offsetWidth/2;
+  var magnifier_panel_top  = this.last_cy - this.magnifier_container.offsetHeight/2;
 
   // position zoom container
   var style = [];
-//  style.push('width:' + this.conf.ZOOM_SIZE + 'px');
-//  style.push('height:' + this.conf.ZOOM_SIZE + 'px');
-  style.push('top:' + zoom_panel_top + 'px');
-  style.push('left:' + zoom_panel_left + 'px');
-  //style.push('border-radius:' + this.conf.ZOOM_SIZE_BY2 + 'px');
+  style.push('top:' + magnifier_panel_top + 'px');
+  style.push('left:' + magnifier_panel_left + 'px');
   style.push('border-radius:2em;');
-  this.zoom_container.setAttribute('style', style.join(';'));
+  this.magnifier_container.setAttribute('style', style.join(';'));
 
   // position filecontent
   style = [];
   style.push('position: absolute');
-  var scaled_img_left = this.zoom_container.offsetWidth/2 - this.last_cx * this.zoom_scale;
-  var scaled_img_top  = this.zoom_container.offsetHeight/2 - this.last_cy * this.zoom_scale;
+  var scaled_img_left = this.magnifier_container.offsetWidth/2 - this.last_cx * this.magnifier_scale;
+  var scaled_img_top  = this.magnifier_container.offsetHeight/2 - this.last_cy * this.magnifier_scale;
   style.push('top:' + scaled_img_top + 'px');
   style.push('left:' + scaled_img_left + 'px');
-  this.zoom_container.childNodes[0].setAttribute('style', style.join(';'));
-  this.zoom_container.childNodes[1].setAttribute('style', style.join(';'));
-  this.zoom_container.childNodes[2].setAttribute('style', style.join(';'));
+  this.magnifier_container.childNodes[0].setAttribute('style', style.join(';'));
+  this.magnifier_container.childNodes[1].setAttribute('style', style.join(';'));
+  this.magnifier_container.childNodes[2].setAttribute('style', style.join(';'));
 }
 
 _via_file_annotator.prototype._file_load_show_error_page = function() {
@@ -451,11 +447,27 @@ _via_file_annotator.prototype._file_html_element_compute_scale = function() {
   }
 
   var ar = cw0/ch0;
-  var ch = maxh;
+  var ch, cw;
+  var ch = ch0;
   var cw = Math.floor(ar * ch);
-  if ( cw > maxw ) {
+  switch(this.va.zoom_mode) {
+  case _VIA_ZOOM_MODE.FITHEIGHT:
+    ch = maxh;
+    cw = Math.floor(ar * ch);
+    if ( cw > maxw ) {
+      cw = maxw;
+      ch = Math.floor(cw/ar);
+    }
+
+    break;
+  case _VIA_ZOOM_MODE.FITWIDTH:
     cw = maxw;
     ch = Math.floor(cw/ar);
+    break;
+  default:
+    var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+    ch = Math.floor(zoom_scale_value * ch0);
+    cw = Math.floor(ar * ch);
   }
   this.cwidth = cw;
   this.cheight = ch;
@@ -510,10 +522,10 @@ _via_file_annotator.prototype._file_html_element_ready = function() {
   this.c.appendChild(this.tempr_canvas);
 
   // zoom container
-  this.zoom_container = document.createElement('div');
-  this.zoom_container.setAttribute('class', 'zoom_container');
-  this.zoom_container.classList.add('hide');
-  this.c.appendChild(this.zoom_container);
+  this.magnifier_container = document.createElement('div');
+  this.magnifier_container.setAttribute('class', 'magnifier_container');
+  this.magnifier_container.classList.add('hide');
+  this.c.appendChild(this.magnifier_container);
 
   // keyboard and mouse input handlers
   this.input = document.createElement('div');
@@ -568,6 +580,18 @@ _via_file_annotator.prototype._rinput_remove_input_handlers = function() {
 }
 
 _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
+  if ( !e.ctrlKey && (e.key === 'b' || e.key === 'l') ) {
+    e.preventDefault();
+    if(e.key === 'b') {
+      this.show_region_shape = !this.show_region_shape;
+    } else {
+      this.show_region_label = !this.show_region_label;
+    }
+    this._creg_clear();
+    this._creg_draw_all();
+    return;
+  }
+  
   if ( e.key === 'n' || e.key === 'p' ) {
     e.preventDefault();
     if(e.key === 'n') {
@@ -575,6 +599,7 @@ _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
     } else {
       this.va.emit_event('view_prev', {});
     }
+    return;
   }
 
   if ( e.key === 'Backspace' || e.key === 'Delete' ) {
@@ -628,34 +653,41 @@ _via_file_annotator.prototype._rinput_keydown_handler = function(e) {
     return;
   }
 
-  if ( e.key === '-' ) {
-    if(this._is_zoom_enabled) {
-      if(this.zoom_scale_index > 0) {
-        this.zoom_scale_index = this.zoom_scale_index - 1;
-        this.zoom_scale = this.zoom_scale_list[this.zoom_scale_index];
-        _via_util_msg_show('Zoom scale reduced to ' + this.zoom_scale);
-        this.zoom_container.classList.add('hide');
-        this._zoom_activate();
-        this.zoom_container.classList.remove('hide');
+  if (!e.ctrlKey && (e.key === 'm' || (e.shiftKey && e.key === 'M'))) {
+    e.preventDefault();
+
+    if(e.key === 'm') {
+      this._magnifier_toggle();
+    } else {
+      // cycle through different level of magnification
+      if((this.magnifier_scale_index + 1) === this.magnifier_scale_list.length) {
+        this.magnifier_scale_index = 0;
       } else {
-        _via_util_msg_show('Reached minimum limit of zoom');
+        this.magnifier_scale_index = this.magnifier_scale_index + 1;
       }
+      this.magnifier_scale = this.magnifier_scale_list[this.magnifier_scale_index];
+      _via_util_msg_show('Magnification changed to ' + this.magnifier_scale);
+      this.magnifier_container.classList.add('hide');
+      this._magnifier_activate();
+      this.magnifier_container.classList.remove('hide');
     }
+    return;
   }
 
-  if ( e.shiftKey && e.key === '+') {
-    if(this._is_zoom_enabled) {
-      if(this.zoom_scale_index < this.zoom_scale_list.length) {
-        this.zoom_scale_index = this.zoom_scale_index + 1;
-        this.zoom_scale = this.zoom_scale_list[this.zoom_scale_index];
-        _via_util_msg_show('Zoom scale increased to ' + this.zoom_scale);
-        this.zoom_container.classList.add('hide');
-        this._zoom_activate();
-        this.zoom_container.classList.remove('hide');
-      } else {
-        _via_util_msg_show('Reached maximum limit of zoom');
-      }
+  if ( !e.ctrlKey && (e.key === '-' || e.key === '=' || (e.shiftKey && e.key === '+')) ) {
+    e.preventDefault();
+    switch(e.key) {
+    case '=':
+      this._zoom_reset();
+      break;
+    case '+':
+      this._zoom_in();
+      break;
+    case '-':
+      this._zoom_out();
+      break;
     }
+    return;
   }
 
   if ( e.key === 'Escape' ) {
@@ -777,6 +809,10 @@ _via_file_annotator.prototype._rinput_mousedown_handler = function(e) {
       // mousedown was on control point of one of the selected regions
       this.resize_selected_mid_index = sel_region_cp[0];
       this.resize_control_point_index = sel_region_cp[1];
+      this.resize_type = sel_region_cp[2];
+      if(this.resize_type === 'edge') {
+        this.resize_edge_xy = [cx, cy];
+      }
       this._state_set( _VIA_RINPUT_STATE.REGION_RESIZE_ONGOING );
     } else {
       // mousedown was not on a control point, two possibilities:
@@ -904,8 +940,8 @@ _via_file_annotator.prototype._rinput_mouseup_handler = function(e) {
       var cdy = canvas_input_pts[3] - canvas_input_pts[1];
       var mid_list = this.selected_mid_list.slice(0);
       this._metadata_move_region(mid_list, cdx, cdy);
-      if(this._is_zoom_enabled) {
-        this.zoom_rshape_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height); // required to clear old region
+      if(this._is_magnifier_enabled) {
+        this.magnifier_rshape_ctx.clearRect(0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height); // required to clear old region
       }
       this._tmpreg_clear();
       this.user_input_pts = [];
@@ -915,14 +951,43 @@ _via_file_annotator.prototype._rinput_mouseup_handler = function(e) {
   }
 
   if ( this.state_id === _VIA_RINPUT_STATE.REGION_RESIZE_ONGOING ) {
-    this._metadata_resize_region(this.resize_selected_mid_index,
-                                 this.resize_control_point_index,
-                                 cx, cy);
-    if(this._is_zoom_enabled) {
-      this.zoom_rshape_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height); // required to clear old region
+    var resize_mid = this.selected_mid_list[this.resize_selected_mid_index];
+    var shape_id = this.creg[resize_mid][0];
+    if((shape_id === _VIA_RSHAPE.POLYLINE || shape_id === _VIA_RSHAPE.POLYGON) &&
+       (e.ctrlKey || e.metaKey)) {
+      // if on vertex, delete it
+      // if on edge, add a new vertex
+      var npts = this.d.store.metadata[resize_mid].xy.length - 1; // -1 because first element is shape_id
+      if((shape_id === _VIA_RSHAPE.POLYLINE && npts === 4) ||
+         (shape_id === _VIA_RSHAPE.POLYGON && npts === 6)) {
+        _via_util_msg_show('Cannot delete vertex as it would result in a degenerate region');
+      } else {
+        if(this.resize_type === 'cp') {
+          // delete vertex
+          this._metadata_polygon_del_vertex(this.resize_selected_mid_index,
+                                            this.resize_control_point_index);
+        } else if(this.resize_type === 'edge') {
+          // add a new vertex
+          this._metadata_polygon_add_vertex(this.resize_selected_mid_index,
+                                            this.resize_control_point_index,
+                                            this.resize_edge_xy[0],
+                                            this.resize_edge_xy[1]);
+        }
+      }
+    } else {
+      this._metadata_resize_region(this.resize_selected_mid_index,
+                                   this.resize_control_point_index,
+                                   cx, cy);
+    }
+
+    if(this._is_magnifier_enabled) {
+      this.magnifier_rshape_ctx.clearRect(0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height); // required to clear old region
     }
     this._tmpreg_clear();
     this.user_input_pts = [];
+    this.resized_selected_mid_index = -1;
+    this.resize_control_point_index = -1;
+    this.resize_type = '';
     this._state_set( _VIA_RINPUT_STATE.REGION_SELECTED );
     return;
   }
@@ -965,8 +1030,8 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
   this.last_cx = cx;
   this.last_cy = cy;
 
-  if(this._is_zoom_enabled) {
-    this._zoom_update_position();
+  if(this._is_magnifier_enabled) {
+    this._magnifier_update_position();
   }
 
   var pts = this.user_input_pts.slice(0);
@@ -987,6 +1052,7 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
   }
 
   if ( this.state_id === _VIA_RINPUT_STATE.REGION_SELECTED ) {
+    // sel_region_cp = [metadata_index, control_point_index, type = {'edge', 'cp'}]
     var sel_region_cp = this._creg_is_on_sel_region_cp(cx, cy,
                                                        this.conf.CONTROL_POINT_CLICK_TOL);
 
@@ -1025,11 +1091,19 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
       case _VIA_RSHAPE.LINE:
       case _VIA_RSHAPE.POLYGON:
       case _VIA_RSHAPE.POLYLINE:
-        this.input.style.cursor = 'cell';
+        this.input.style.cursor = 'crosshair';
+        // fall through and show message if it is polygon or polyline
+      case _VIA_RSHAPE.POLYGON:
+      case _VIA_RSHAPE.POLYLINE:
+        _via_util_msg_show('To move vertex, simply drag the vertex. To add vertex, press [Ctrl] key and click on the edge. To delete vertex, press [Ctrl] (or [Command]) key and click on vertex.');
         break;
       }
     } else {
-      this.input.style.cursor = 'default';
+      if( this._is_point_inside_sel_regions(cx, cy) === -1 ) {
+        this.input.style.cursor = 'default';
+      } else {
+        this.input.style.cursor = 'move';
+      }
     }
     return;
   }
@@ -1053,15 +1127,15 @@ _via_file_annotator.prototype._rinput_mousemove_handler = function(e) {
 
 _via_file_annotator.prototype._rinput_mouseout_handler = function(e) {
   e.stopPropagation();
-  if(this._is_zoom_enabled) {
-    this.zoom_container.classList.add('hide');
+  if(this._is_magnifier_enabled) {
+    this.magnifier_container.classList.add('hide');
   }
 }
 
 _via_file_annotator.prototype._rinput_mouseover_handler = function(e) {
   e.stopPropagation();
-  if(this._is_zoom_enabled) {
-    this.zoom_container.classList.remove('hide');
+  if(this._is_magnifier_enabled) {
+    this.magnifier_container.classList.remove('hide');
   }
 }
 
@@ -1230,6 +1304,43 @@ _via_file_annotator.prototype._is_point_inside_sel_regions = function(cx, cy) {
 //
 // metadata
 //
+_via_file_annotator.prototype._metadata_polygon_del_vertex = function(mindex, cpindex) {
+  return new Promise( function(ok_callback, err_callback) {
+    var mid = this.selected_mid_list[mindex];
+    var xy_with_del_cp = this.d.store.metadata[mid].xy.slice();
+    // note: cpindex is indexed from 1
+    var del_cpindex = cpindex - 1;
+    xy_with_del_cp.splice(1 + 2*del_cpindex, 2); // +1 because first element is shape_id
+    this.d.metadata_update_xy(this.vid, mid, xy_with_del_cp).then( function(ok) {
+      this._creg_draw_all();
+      _via_util_msg_show('Deleted vertex at index [' + cpindex + ']');
+      ok_callback(ok.mid);
+    }.bind(this), function(err) {
+      console.warn(err);
+      err_callback();
+    }.bind(this));
+  }.bind(this));
+}
+
+_via_file_annotator.prototype._metadata_polygon_add_vertex = function(mindex, cpindex, cx, cy) {
+  return new Promise( function(ok_callback, err_callback) {
+    var mid = this.selected_mid_list[mindex];
+    var x = cx * this.cscale;
+    var y = cy * this.cscale;
+    var xy_with_added_cp = this.d.store.metadata[mid].xy.slice();
+    var new_cp_index = cpindex + 1; // add to the next position
+    xy_with_added_cp.splice(1 + 2*new_cp_index, 0, x, y); // +1 because first element is shape_id
+    this.d.metadata_update_xy(this.vid, mid, xy_with_added_cp).then( function(ok) {
+      this._creg_draw_all();
+      _via_util_msg_show('Added vertex after existing vertex at index [' + cpindex + ']');
+      ok_callback(ok.mid);
+    }.bind(this), function(err) {
+      console.warn(err);
+      err_callback();
+    }.bind(this));
+  }.bind(this));
+}
+
 _via_file_annotator.prototype._metadata_resize_region = function(mindex, cpindex, cx, cy) {
   return new Promise( function(ok_callback, err_callback) {
     var mid = this.selected_mid_list[mindex];
@@ -1502,11 +1613,17 @@ _via_file_annotator.prototype._creg_draw_file_label = function() {
 }
 
 _via_file_annotator.prototype._creg_draw = function(mid) {
-  var is_selected = this.selected_mid_list.includes(mid);
-  this._draw(this.rshapectx, this.creg[mid], is_selected)
+  if(this.show_region_shape) {
+    var is_selected = this.selected_mid_list.includes(mid);
+    this._draw(this.rshapectx, this.creg[mid], is_selected)
+  }
 }
 
 _via_file_annotator.prototype._creg_draw_label = function(mid) {
+  if(!this.show_region_label) {
+    return;
+  }
+  
   if ( this.d.store.metadata[mid].av.hasOwnProperty(this.d.store.config.ui['spatial_region_label_attribute_id']) ) {
     var lx = this.creg[mid][1];
     var ly = this.creg[mid][2];
@@ -1852,17 +1969,96 @@ _via_file_annotator.prototype._creg_is_on_control_point = function(xy, cx, cy, t
   return -1;
 }
 
-_via_file_annotator.prototype._creg_is_on_sel_region_cp = function(cx, cy, tolerance) {
+_via_file_annotator.prototype._creg_is_on_polygon_edge = function(xy, cx, cy, tolerance) {
+  var cp = this._creg_get_control_points(xy); // cp[0] = shape_id
+  var n = cp.length;
+  var distance_to_edge = [];
+  for ( var i = 1; i < n - 2; i = i + 2 ) {
+    var di = this.dist_to_line(cx, cy, cp[i], cp[i+1], cp[i+2], cp[i+3]);
+    distance_to_edge.push(di);
+  }
+  var shape_id = cp[0];
+  if(shape_id === _VIA_RSHAPE.POLYGON) {
+    // add closing edge
+    var di = this.dist_to_line(cx, cy, cp[n-2], cp[n-1], cp[1], cp[2]);
+    distance_to_edge.push(di);
+  }
+
+  var smallest_value = distance_to_edge[0];
+  var smallest_index = 0;
+  n = distance_to_edge.length;
+  for ( i = 1; i < n; ++i ) {
+    if ( distance_to_edge[i] < smallest_value ) {
+      smallest_value = distance_to_edge[i];
+      smallest_index = i;
+    }
+  }
+  if ( smallest_value < tolerance ) {
+    return smallest_index;
+  } else {
+    return -1;
+  }
+}
+
+_via_file_annotator.prototype.dist_to_line = function(x, y, x1, y1, x2, y2) {
+  if ( this.is_point_inside_bounding_box(x, y, x1, y1, x2, y2) ) {
+    var dy = y2 - y1;
+    var dx = x2 - x1;
+    var nr = Math.abs( dy*x - dx*y + x2*y1 - y2*x1 );
+    var dr = Math.sqrt( dx*dx + dy*dy );
+    var dist = nr / dr;
+    return Math.round(dist);
+  } else {
+    return Number.MAX_SAFE_INTEGER;
+  }
+}
+
+_via_file_annotator.prototype.is_point_inside_bounding_box = function(x, y, x1, y1, x2, y2) {
+  // ensure that (x1,y1) is top left and (x2,y2) is bottom right corner of rectangle
+  var rect = {};
+  if( x1 < x2 ) {
+    rect.x1 = x1;
+    rect.x2 = x2;
+  } else {
+    rect.x1 = x2;
+    rect.x2 = x1;
+  }
+  if ( y1 < y2 ) {
+    rect.y1 = y1;
+    rect.y2 = y2;
+  } else {
+    rect.y1 = y2;
+    rect.y2 = y1;
+  }
+
+  if ( x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2 ) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+_via_file_annotator.prototype._creg_is_on_sel_region_cp  = function(cx, cy, tolerance) {
   var n = this.selected_mid_list.length;
-  var mid, shape_id;
-  var sel_region_cp = [-1, -1];
+  var mid;
+  var sel_region_cp = [-1, -1, '']; // [ metadata_index, control_point_index, type = {cp, edge} ]
   for ( var i = 0; i < n; ++i ) {
     mid = this.selected_mid_list[i];
     var cp_index = this._creg_is_on_control_point(this.creg[mid], cx, cy, tolerance);
     // is mousedown on region control point?
     if ( cp_index !== -1 ) {
-      sel_region_cp = [i, cp_index];
+      sel_region_cp = [i, cp_index, 'cp'];
       break;
+    } else {
+      // for polyline and polygon, check if it is on the edge
+      var shape_id = this.creg[mid][0];
+      if(shape_id === _VIA_RSHAPE.POLYLINE || shape_id === _VIA_RSHAPE.POLYGON) {
+        var edge_index = this._creg_is_on_polygon_edge(this.creg[mid], cx, cy, tolerance);
+        if(edge_index !== -1) {
+          sel_region_cp = [i, edge_index, 'edge'];
+          break;
+        }
+      }
     }
   }
   return sel_region_cp;
@@ -2097,8 +2293,8 @@ _via_file_annotator.prototype._tmpreg_move_sel_region_cp = function(mindex, cpin
 
 _via_file_annotator.prototype._tmpreg_clear = function() {
   this.temprctx.clearRect(0, 0, this.tempr_canvas.width, this.tempr_canvas.height);
-  if(this._is_zoom_enabled) {
-    this.zoom_tempr_ctx.clearRect(0, 0, this.zoom_canvas_width, this.zoom_canvas_height);
+  if(this._is_magnifier_enabled) {
+    this.magnifier_tempr_ctx.clearRect(0, 0, this.magnifier_canvas_width, this.magnifier_canvas_height);
   }
 }
 
@@ -2147,22 +2343,22 @@ _via_file_annotator.prototype._draw = function(ctx, xy, is_selected) {
     }
   }
 
-  if(this._is_zoom_enabled) {
+  if(this._is_magnifier_enabled) {
     var scaled_xy = [ xy[0] ];
     for(var i=1; i<xy.length; ++i) {
-      scaled_xy[i] = xy[i] * this.zoom_scale;
+      scaled_xy[i] = xy[i] * this.magnifier_scale;
     }
     if(ctx.canvas.id === "region_shape") {
-      this._draw(this.zoom_rshape_ctx, scaled_xy, is_selected);
+      this._draw(this.magnifier_rshape_ctx, scaled_xy, is_selected);
       if ( is_selected ) {
         var cp = this._creg_get_control_points(scaled_xy); // cp[0] = shape_id
         var n = cp.length;
         for ( var i = 1; i < n; i = i + 2 ) {
-          this._draw_control_point(this.zoom_rshape_ctx, cp[i], cp[i+1]);
+          this._draw_control_point(this.magnifier_rshape_ctx, cp[i], cp[i+1]);
         }
       }
     } else if(ctx.canvas.id === "region_input") {
-      this._draw(this.zoom_tempr_ctx, scaled_xy, is_selected);
+      this._draw(this.magnifier_tempr_ctx, scaled_xy, is_selected);
     }
   }
 }
@@ -2763,14 +2959,19 @@ _via_file_annotator.prototype._metadata_attribute_io_html_element = function(mid
       aval = dval;
     }
 
+    var option_selected = false;
     for ( var oid in this.d.store.attribute[aid].options ) {
       var oi = document.createElement('option');
       oi.setAttribute('value', oid);
       oi.innerHTML = this.d.store.attribute[aid].options[oid];
       if ( oid === aval ) {
         oi.setAttribute('selected', 'true');
+        option_selected = true;
       }
       el.appendChild(oi);
+    }
+    if(!option_selected) {
+      el.selectedIndex = -1; // to indicate that nothing has been selected
     }
     el.addEventListener('change', this._metadata_on_change.bind(this));
     break;
@@ -2843,4 +3044,70 @@ _via_file_annotator.prototype._metadata_attribute_io_html_element = function(mid
   el.setAttribute('data-mid', mid);
   el.setAttribute('data-aid', aid);
   return el;
+}
+
+//
+// zoom
+//
+_via_file_annotator.prototype._zoom_in = function() {
+  if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
+     this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
+    this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
+    this.va.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+    _via_util_msg_show('Showing original size');
+  } else {
+    var next_zoom_scale_index = this.va.zoom_scale_value_index + 1;
+    if(next_zoom_scale_index === _VIA_ZOOM_SCALE_VALUE_LIST.length) {
+      _via_util_msg_show('Cannot zoom in any further');
+      return;
+    }
+    this.va.zoom_scale_value_index = next_zoom_scale_index;
+    var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+    _via_util_msg_show('Showing at zoom level of ' + zoom_scale_value + 'X');
+  }
+  this.va.view_show(this.vid);
+}
+
+_via_file_annotator.prototype._zoom_out = function() {
+  if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
+     this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
+    this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
+    this.va.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+  } else {
+    if(this.va.zoom_scale_value_index === 0) {
+      _via_util_msg_show('Cannot zoom out any further');
+      return;
+    }
+    this.va.zoom_scale_value_index = this.va.zoom_scale_value_index - 1;
+    var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+    _via_util_msg_show('Showing at zoom level of ' + zoom_scale_value + 'X');
+  }
+  this.va.view_show(this.vid);
+}
+
+_via_file_annotator.prototype._zoom_reset = function() {
+  if(this.va.zoom_mode === _VIA_ZOOM_MODE.FITHEIGHT ||
+     this.va.zoom_mode === _VIA_ZOOM_MODE.FITWIDTH) {
+    this.va.zoom_mode = _VIA_ZOOM_MODE.SCALE;
+  }
+  this.va.zoom_scale_value_index = _VIA_ZOOM_SCALE_DEFAULT_INDEX;
+  var zoom_scale_value = _VIA_ZOOM_SCALE_VALUE_LIST[this.va.zoom_scale_value_index];
+  _via_util_msg_show('Showing at zoom level of ' + zoom_scale_value + 'X');
+  this.va.view_show(this.vid);
+}
+
+_via_file_annotator.prototype._zoom_fit_screen = function() {
+  switch(this.va.zoom_mode) {
+  case _VIA_ZOOM_MODE.FITHEIGHT:
+    this.va.zoom_mode = _VIA_ZOOM_MODE.FITWIDTH;
+    _via_util_msg_show('Scaled image to fill screen width');
+    break;
+  case _VIA_ZOOM_MODE.FITWIDTH:
+    this.va.zoom_mode = _VIA_ZOOM_MODE.FITHEIGHT;
+    _via_util_msg_show('Scaled image to fill screen height');
+    break;
+  default:
+    this.va.zoom_mode = _VIA_ZOOM_MODE.FITHEIGHT;
+  }
+  this.va.view_show(this.vid);
 }

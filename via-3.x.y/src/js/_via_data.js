@@ -42,6 +42,7 @@ _via_data.prototype._init_default_project = function() {
       'file_content_align':'center',
       'file_metadata_editor_visible':true,
       'spatial_metadata_editor_visible':true,
+      'temporal_segment_metadata_editor_visible':true,
       'spatial_region_label_attribute_id':'',
       'gtimeline_visible_row_count':'4',
     },
@@ -89,17 +90,16 @@ _via_data.prototype.attribute_add = function(name, anchor_id, type, desc, option
       err_callback('attribute already exists');
       return;
     }
-
     var aid = this._attribute_get_new_id();
-    var desc = desc || '';
-    var options = options || {};
-    var default_option_id = default_option_id || '';
+    var attr_desc = desc || '';
+    var attr_options = options || {};
+    var attr_default_option_id = default_option_id || '';
     this.store['attribute'][aid] = new _via_attribute(name,
                                                       anchor_id,
                                                       type,
-                                                      desc,
-                                                      options,
-                                                      default_option_id);
+                                                      attr_desc,
+                                                      attr_options,
+                                                      attr_default_option_id);
     this._cache_update_attribute_group();
     this.emit_event( 'attribute_add', { 'aid':aid } );
     ok_callback(aid);

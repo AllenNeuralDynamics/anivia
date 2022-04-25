@@ -53,6 +53,7 @@ function _via(via_container) {
   this.editor = new _via_editor(this.d, this.va, this.editor_container);
 
   this.view_manager_container = document.createElement('div');
+  this.view_manager_container.setAttribute('id', 'view_manager_container');
   this.vm = new _via_view_manager(this.d, this.va, this.view_manager_container);
   this.vm._init();
 
@@ -67,9 +68,24 @@ function _via(via_container) {
   this.cp.on_event('editor_toggle', this._ID, function(data, event_payload) {
     this.editor.toggle();
   }.bind(this));
-  this.cp.on_event('zoom_toggle', this._ID, function(data, event_payload) {
+  this.cp.on_event('magnifier_toggle', this._ID, function(data, event_payload) {
     if(this.va.view_mode === _VIA_VIEW_MODE.IMAGE1) {
-      this.va.file_annotator[0][0]._zoom_toggle();
+      this.va.file_annotator[0][0]._magnifier_toggle();
+    }
+  }.bind(this));
+  this.cp.on_event('zoom_in', this._ID, function(data, event_payload) {
+    if(this.va.view_mode === _VIA_VIEW_MODE.IMAGE1) {
+      this.va.file_annotator[0][0]._zoom_in();
+    }
+  }.bind(this));
+  this.cp.on_event('zoom_out', this._ID, function(data, event_payload) {
+    if(this.va.view_mode === _VIA_VIEW_MODE.IMAGE1) {
+      this.va.file_annotator[0][0]._zoom_out();
+    }
+  }.bind(this));
+  this.cp.on_event('fit_screen', this._ID, function(data, event_payload) {
+    if(this.va.view_mode === _VIA_VIEW_MODE.IMAGE1) {
+      this.va.file_annotator[0][0]._zoom_fit_screen();
     }
   }.bind(this));
 

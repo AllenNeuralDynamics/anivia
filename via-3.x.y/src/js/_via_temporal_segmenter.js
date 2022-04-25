@@ -55,7 +55,7 @@ function _via_temporal_segmenter(file_annotator, container, vid, data, media_ele
   this.metadata_last_added_mid = '';
   this.is_init_success = false;
 
-  this.show_audio = false;             // experimental, hence disabled by default
+  //this.show_audio = true;             // experimental, hence disabled by default
   this.audio_analyser_active = false;
 
   // registers on_event(), emit_event(), ... methods from
@@ -82,6 +82,10 @@ function _via_temporal_segmenter(file_annotator, container, vid, data, media_ele
 }
 
 _via_temporal_segmenter.prototype._init = function() {
+  if ( ! this.d.store.config.ui.hasOwnProperty('temporal_segment_metadata_editor_visible') ) {
+    this.d.store.config.ui['temporal_segment_metadata_editor_visible'] = true;
+  }
+
   this.group_aid_candidate_list = [];
   if ( this.d.cache.attribute_group.hasOwnProperty('FILE1_Z2_XY0') ) {
     for ( var aindex in this.d.cache.attribute_group['FILE1_Z2_XY0'] ) {
@@ -98,8 +102,21 @@ _via_temporal_segmenter.prototype._init = function() {
     this._init_on_success(this.group_aid_candidate_list[0]);
     this.is_init_success = true;
   } else {
-    this._init_on_fail();
-    this.is_init_success = false;
+    // add a default temporal segment attribute
+    var promise = this.d.attribute_add('TEMPORAL-SEGMENTS',
+                                       'FILE1_Z2_XY0',
+                                       _VIA_ATTRIBUTE_TYPE.SELECT,
+                                       'Temporal segment attribute added by default',
+                                       {'default':'Default'},
+                                       '');
+    promise.then(function(new_attribute_aid) {
+      this.group_aid_candidate_list.push(new_attribute_aid);
+      this._init_on_success(new_attribute_aid);
+      this.is_init_success = true;
+    }.bind(this), function(err) {
+      this._init_on_fail();
+      this.is_init_success = false;
+    }.bind(this));
   }
 }
 
@@ -164,7 +181,7 @@ _via_temporal_segmenter.prototype._redraw_all = function() {
     }
   }
 
-  //this._redraw_timeline(); // this is not required
+  //this._redraw_timeline();
 
   // draw marker to show current time in group timeline and group metadata
   this._tmetadata_draw_currenttime_mark(tnow);
@@ -327,6 +344,9 @@ _via_temporal_segmenter.prototype._vtimeline_canvas2time = function(x) {
 }
 
 _via_temporal_segmenter.prototype._vtimeline_mark_draw = function() {
+  // continually update the video timeline timer (required for responsive update)
+  window.requestAnimationFrame(this._vtimeline_mark_draw.bind(this));
+
   var time = this.m.currentTime;
   var cx = this._vtimeline_time2canvas(time);
 
@@ -441,6 +461,11 @@ _via_temporal_segmenter.prototype._tmetadata_init = function() {
   this.tmetadata_container.appendChild(this.gmetadata_container);
   // Note: this.tmetadata_container has already been added to parent container
 
+  this.tseg_metadata_container = document.createElement('div');
+  this.tseg_metadata_container.setAttribute('class', 'tseg_metadata_container');
+  this._tseg_metadata_hide();
+  this.tmetadata_container.appendChild(this.tseg_metadata_container);
+
   if ( this.gid_list.length ) {
     this._tmetadata_group_gid_sel(0);
   }
@@ -511,6 +536,7 @@ _via_temporal_segmenter.prototype._tmetadata_gid_list_reorder = function(gindex_
 
 _via_temporal_segmenter.prototype._tmetadata_onchange_groupby_aid = function(e) {
   this.group_aname_select.blur(); // remove selection of dropdown
+  this._tseg_metadata_hide();
   var new_groupby_aid = e.target.options[e.target.selectedIndex].value;
   this._group_init( new_groupby_aid );
   this._tmetadata_gmetadata_update();
@@ -662,7 +688,9 @@ _via_temporal_segmenter.prototype._tmetadata_gtimeline_init = function() {
   this.gtimeline.addEventListener('mousedown', this._tmetadata_gtimeline_mousedown.bind(this));
   this.gtimeline.addEventListener('mouseup', this._tmetadata_gtimeline_mouseup.bind(this));
   this.gtimeline.addEventListener('mousemove', this._tmetadata_gtimeline_mousemove.bind(this));
+  this.gtimeline.addEventListener('mouseleave', this._tmetadata_gtimeline_mouseleave.bind(this));
 
+  this.gtimeline_pressed = false;
   this.gtimeline.width = this.timeline_container_width;
   this.gtimeline.height = this.linehn[this.GTIMELINE_HEIGHT];
   this.gtimelinectx = this.gtimeline.getContext('2d', {alpha:false});
@@ -840,6 +868,12 @@ _via_temporal_segmenter.prototype._tmetadata_gtimeline_time2canvas = function(t)
 
 _via_temporal_segmenter.prototype._tmetadata_gtimeline_mousemove= function(e) {
   var t = this._tmetadata_gtimeline_canvas2time(e.offsetX);
+  if(this.gtimeline_pressed) {
+    // Mouse is pressed. Seek to time t
+    this.gtimeline.style.cursor = 'col-resize';
+    this.m.currentTime = t;
+    return;
+  }
   var smark_time_str = this._tmetadata_gtimeline_is_on_smark(t);
   if ( smark_time_str !== '' ) {
     this.gtimeline.style.cursor = 'pointer';
@@ -866,16 +900,26 @@ _via_temporal_segmenter.prototype._tmetadata_gtimeline_mousedown = function(e) {
   } else {
     this.m.currentTime = t;
   }
+  this.gtimeline_pressed = true;
 }
 
 _via_temporal_segmenter.prototype._tmetadata_gtimeline_mouseup = function(e) {
+  this.gtimeline_pressed = false;
+  this.gtimeline.style.cursor = 'default';
+}
+
+_via_temporal_segmenter.prototype._tmetadata_gtimeline_mouseleave = function(e) {
+  this.gtimeline_pressed = false;
+  this.gtimeline.style.cursor = 'default';
 }
 
 _via_temporal_segmenter.prototype._tmetadata_gtimeline_is_on_smark = function(t) {
   var smark_time;
+  var zoom_factor = this.linehn[this.DEFAULT_WIDTH_PER_SEC] / this.tmetadata_width_per_sec;
+  var mouse_tolerance = this.GTIMELINE_REGION_MARKER_MOUSE_TOL * zoom_factor;
   for ( var smark_time_str in this.smid ) {
     smark_time = parseFloat(smark_time_str);
-    if ( Math.abs(smark_time - t) <= this.GTIMELINE_REGION_MARKER_MOUSE_TOL ) {
+    if ( Math.abs(smark_time - t) <= mouse_tolerance ) {
       return smark_time_str;
     }
   }
@@ -1173,7 +1217,7 @@ _via_temporal_segmenter.prototype._tmetadata_mid_update_edge = function(eindex, 
   this.edge_show_time = eindex;
   // to ensure only 3 decimal values are stored for time
   var new_value = this.d.store.metadata[this.selected_mid].z[eindex] + dz;
-  new_value = _via_util_float_to_fixed(new_value, 3);
+  new_value = _via_util_float_to_fixed(new_value, _VIA_FLOAT_FIXED_POINT);
 
   // consistency check
   if ( eindex === 0 ) {
@@ -1238,6 +1282,7 @@ _via_temporal_segmenter.prototype._tmetadata_mid_move = function(dt) {
 _via_temporal_segmenter.prototype._tmetadata_mid_del_sel = function(mid) {
   this._tmetadata_mid_del(this.selected_mid);
   this._tmetadata_group_gid_remove_mid_sel();
+  this._tseg_metadata_hide();
   _via_util_msg_show('Temporal segment deleted.');
 }
 
@@ -1415,6 +1460,7 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_mousedown = function(e) {
   if ( gindex !== this.selected_gindex ) {
     // select this gid
     this._tmetadata_group_gid_sel(gindex);
+    this._tseg_metadata_hide();
   }
 
   var edge = this._tmetadata_group_gid_is_on_edge(gid, t);
@@ -1445,11 +1491,13 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_mousedown = function(e) {
       } else {
         // else, select metadata
         this._tmetadata_group_gid_sel_metadata(mindex);
+        this._tseg_metadata_show();
       }
     } else {
       if ( this.selected_mindex !== -1 ) {
         // remove metadata selection
         this._tmetadata_group_gid_remove_mid_sel(this.selected_mindex);
+        this._tseg_metadata_hide();
       }
     }
   }
@@ -2029,7 +2077,7 @@ _via_temporal_segmenter.prototype._time2strms = function(t) {
   var hh = Math.floor(t / 3600);
   var mm = Math.floor( (t - hh * 3600) / 60 );
   var ss = Math.floor( t - hh*3600 - mm*60 );
-  var ms = Math.floor( (t - Math.floor(t) ) * 1000 );
+  var ms = Math.round( (t - Math.floor(t) ) * 1000 );
   if ( hh < 10 ) {
     hh = '0' + hh;
   }
@@ -2040,7 +2088,11 @@ _via_temporal_segmenter.prototype._time2strms = function(t) {
     ss = '0' + ss;
   }
   if ( ms < 100 ) {
-    ms = '0' + ms;
+    if ( ms < 10 ) {
+      ms = '00' + ms;
+    } else {
+      ms = '0' + ms;
+    }
   }
   return hh + ':' + mm + ':' + ss + '.' + ms;
 }
@@ -2229,4 +2281,273 @@ _via_temporal_segmenter.prototype._on_event_metadata_update_bulk = function(data
   if ( this.vid === event_payload.vid ) {
     _via_util_msg_show('Updated ' + event_payload.mid_list.length + ' metadata');
   }
+}
+
+//
+// temporal segment metadata container
+//
+_via_temporal_segmenter.prototype._tseg_metadata_show = function() {
+  this.tseg_metadata_container.classList.remove('hide');
+  this._tseg_metadata_update();
+  this._tseg_metadata_set_position();
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_hide = function() {
+  this.tseg_metadata_container.classList.add('hide');
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_toggle = function() {
+  this.d.store.config.ui['temporal_segment_metadata_editor_visible'] = ! this.d.store.config.ui['temporal_segment_metadata_editor_visible'];
+  this._tseg_metadata_show();
+  this._tseg_metadata_update();
+  this._tseg_metadata_set_position();
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_update = function() {
+  this.tseg_metadata_container.innerHTML = '';
+  var tseg_aid_list = [];
+
+  for(var aid in this.d.store.attribute) {
+    if(this.d.store.attribute[aid]['anchor_id'] === 'FILE1_Z2_XY0' &&
+       aid != this.groupby_aid) {
+      tseg_aid_list.push(aid);
+    }
+  }
+
+  var table = document.createElement('table');
+  var tbody = document.createElement('tbody');
+  var thead = document.createElement('thead');
+
+  var header = document.createElement('tr');
+
+  if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
+    var aid;
+    var col_count = 0;
+    for ( var aindex in tseg_aid_list ) {
+      aid = tseg_aid_list[aindex];
+      var th = document.createElement('th');
+      th.innerHTML = this.d.store.attribute[aid].aname;
+      header.appendChild(th);
+      col_count += 1;
+    }
+
+    // show value of each attribute
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-mid', mid);
+
+    var mid = this.selected_mid;
+    var aid;
+    for ( var aindex in tseg_aid_list ) {
+      aid = tseg_aid_list[aindex];
+      var td = document.createElement('td');
+      td.setAttribute('data-aid', aid);
+      td.appendChild( this._tseg_metadata_attribute_io_html_element(mid, aid) );
+      tr.appendChild(td);
+    }
+    var td = document.createElement('td');
+    tr.appendChild(td); // empty row for control buttons
+
+    tbody.appendChild(tr);
+  }
+  var minimise_button = document.createElement('span');
+  minimise_button.setAttribute('class', 'text_button');
+  if ( this.d.store.config.ui['temporal_segment_metadata_editor_visible'] ) {
+    minimise_button.innerHTML = '&larr;';
+    minimise_button.setAttribute('title', 'Hide (i.e. minimise) temporal segment metadata editor');
+  } else {
+    minimise_button.innerHTML = '&rarr;';
+    minimise_button.setAttribute('title', 'Show temporal segment metadata editor');
+  }
+  minimise_button.addEventListener('click', this._tseg_metadata_toggle.bind(this));
+  var minimise_container = document.createElement('th');
+  minimise_container.setAttribute('rowspan', '2');
+  minimise_container.appendChild(minimise_button);
+  header.appendChild(minimise_container);
+  col_count += 1;
+  thead.appendChild(header);
+
+  // add a row containing all the tool buttons
+  var toolbar = document.createElement('tr');
+  var toolbar_container = document.createElement('td');
+  toolbar_container.setAttribute('colspan', tseg_aid_list.length + 1); // 1 extra column for minimise button
+  toolbar_container.setAttribute('style', 'text-align:center;')
+
+  var del = _via_util_get_svg_button('micon_delete', 'Delete selected temporal segment', 'del_selected_tset');
+  del.addEventListener('click', this._tmetadata_mid_del_sel.bind(this));
+  toolbar_container.appendChild(del);
+  toolbar.appendChild(toolbar_container);
+  tbody.appendChild(toolbar);
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  this.tseg_metadata_container.innerHTML = '';
+  this.tseg_metadata_container.appendChild(table);
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_set_position = function() {
+  var gid = this.selected_gid;
+  var mid = this.selected_mid;
+
+  var t0 = this.d.store.metadata[mid].z[0];
+  var t1 = this.d.store.metadata[mid].z[1];
+  var tseg_x0 = this._tmetadata_gtimeline_time2canvas(t0);
+  var tseg_x1 = this._tmetadata_gtimeline_time2canvas(t1);
+
+  var tseg_canvas_x = this.gcanvas[gid].offsetLeft;
+  var tseg_canvas_y = this.gcanvas[gid].offsetTop;
+
+  this.tseg_metadata_container.style.left = (tseg_canvas_x + tseg_x0) + 'px';
+  this.tseg_metadata_container.style.top = (tseg_canvas_y - this.tseg_metadata_container.offsetHeight) + 'px';
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_header_html = function(aid_list) {
+  var tr = document.createElement('tr');
+  var aid;
+  for ( var aindex in aid_list ) {
+    aid = aid_list[aindex];
+    var th = document.createElement('th');
+    th.innerHTML = this.d.store.attribute[aid].aname;
+    tr.appendChild(th);
+  }
+  return tr;
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_on_change = function(e) {
+  var mid = e.target.dataset.mid;
+  var aid = e.target.dataset.aid;
+  var aval = e.target.value;
+  if ( e.target.type === 'checkbox' &&
+       this.d.store.metadata[mid].av.hasOwnProperty(aid)
+     ) {
+    var values = this.d.store.metadata[mid].av[aid].split(',');
+    if ( this.d.store.metadata[mid].av[aid] !== '' ) {
+      var vindex = values.indexOf(e.target.value);
+      if ( e.target.checked ) {
+        // add this value
+        if ( vindex === -1 ) {
+          values.push(e.target.value);
+        }
+      } else {
+        // remove this value
+        var vindex = values.indexOf(aval);
+        if ( vindex !== -1 ) {
+          values.splice(vindex, 1);
+        }
+      }
+      aval = values.join(',');
+    }
+  }
+
+  this.d.metadata_update_av(this.vid, mid, aid, aval).then( function(ok) {
+    //console.log( JSON.stringify(this.d.store.metadata[ok.mid].av) );
+  }.bind(this));
+}
+
+_via_temporal_segmenter.prototype._tseg_metadata_attribute_io_html_element = function(mid, aid) {
+  var aval  = this.d.store.metadata[mid].av[aid];
+  var dval  = this.d.store.attribute[aid].default_option_id;
+  var atype = this.d.store.attribute[aid].type;
+  var el;
+
+  switch(atype) {
+  case _VIA_ATTRIBUTE_TYPE.TEXT:
+    if ( typeof(aval) === 'undefined' ) {
+      aval = dval;
+    }
+    el = document.createElement('textarea');
+    el.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+    el.innerHTML = aval;
+    break;
+
+  case _VIA_ATTRIBUTE_TYPE.SELECT:
+    el = document.createElement('select');
+    if ( typeof(aval) === 'undefined' ) {
+      aval = dval;
+    }
+
+    var option_selected = false;
+    for ( var oid in this.d.store.attribute[aid].options ) {
+      var oi = document.createElement('option');
+      oi.setAttribute('value', oid);
+      oi.innerHTML = this.d.store.attribute[aid].options[oid];
+      if ( oid === aval ) {
+        oi.setAttribute('selected', 'true');
+        option_selected = true;
+      }
+      el.appendChild(oi);
+    }
+    if(!option_selected) {
+      el.selectedIndex = -1; // to indicate that nothing has been selected
+    }
+    el.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+    break;
+
+  case _VIA_ATTRIBUTE_TYPE.RADIO:
+    el = document.createElement('div');
+
+    if ( typeof(aval) === 'undefined' ) {
+      aval = dval;
+    }
+
+    for ( var oid in this.d.store.attribute[aid].options ) {
+      var radio = document.createElement('input');
+      radio.setAttribute('type', 'radio');
+      radio.setAttribute('value', oid);
+      radio.setAttribute('data-mid', mid);
+      radio.setAttribute('data-aid', aid);
+      radio.setAttribute('name', this.d.store.attribute[aid].aname);
+      if ( oid === aval ) {
+        radio.setAttribute('checked', true);
+      }
+      radio.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+      var label = document.createElement('label');
+      label.innerHTML = this.d.store.attribute[aid].options[oid];
+
+      var br = document.createElement('br');
+      el.appendChild(radio);
+      el.appendChild(label);
+      el.appendChild(br);
+    }
+    break;
+
+  case _VIA_ATTRIBUTE_TYPE.CHECKBOX:
+    el = document.createElement('div');
+    if ( typeof(aval) === 'undefined' ) {
+      if ( typeof(dval) === 'undefined' ) {
+        aval = '';
+      } else {
+        aval = dval;
+      }
+    }
+    var values = aval.split(',');
+    for ( var oid in this.d.store.attribute[aid].options ) {
+      var checkbox = document.createElement('input');
+      checkbox.setAttribute('type', 'checkbox');
+      checkbox.setAttribute('value', oid);
+      checkbox.setAttribute('data-mid', mid);
+      checkbox.setAttribute('data-aid', aid);
+      checkbox.setAttribute('name', this.d.store.attribute[aid].aname);
+
+      if ( values.indexOf(oid) !== -1 ) {
+        checkbox.setAttribute('checked', true);
+      }
+      checkbox.addEventListener('change', this._tseg_metadata_on_change.bind(this));
+      var label = document.createElement('label');
+      label.innerHTML = this.d.store.attribute[aid].options[oid];
+
+      var br = document.createElement('br');
+      el.appendChild(checkbox);
+      el.appendChild(label);
+      el.appendChild(br);
+    }
+    break;
+
+  default:
+    console.log('attribute type ' + atype + ' not implemented yet!');
+    var el = document.createElement('span');
+    el.innerHTML = aval;
+  }
+  el.setAttribute('data-mid', mid);
+  el.setAttribute('data-aid', aid);
+  return el;
 }
