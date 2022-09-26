@@ -12,6 +12,11 @@
     - preload images in adjacent groups to speed up visualization
     - label subgroup of images in a group based on a certain variable
 
+## [2.0.12]
+ * point region now gets assigned default value (issue 393)
+ * filter Image List by Region Attribute (merge request 37, thank you @fvendramin)
+ * increased tolerance (from 5px to 10px) so that point region can be selected easily without errornaeously adding a new point region (thank you @richard)
+
 ## [2.0.11] - March 03, 2021
  * polygon points can now be added/deleted using [Command] key and Click in MacOS (issue 335)
  * status messages can now be disabled (issue 328)
