@@ -86,7 +86,7 @@ var VIA_ANNOTATION_EDITOR_PLACEMENT = {NEAR_REGION:'NEAR_REGION',
 
 var VIA_REGION_EDGE_TOL           = 5;   // pixel
 var VIA_REGION_CONTROL_POINT_SIZE = 2;
-var VIA_POLYGON_VERTEX_MATCH_TOL  = 5;
+var VIA_POLYGON_VERTEX_MATCH_TOL  = 10;
 var VIA_REGION_MIN_DIM            = 3;
 var VIA_MOUSE_CLICK_TOL           = 2;
 var VIA_ELLIPSE_EDGE_TOL          = 0.2; // euclidean distance
