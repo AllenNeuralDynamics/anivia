@@ -11,7 +11,7 @@
 
 function _via(via_container) {
   console.log('Initializing VGG Image Annotator (VIA) version ' + _VIA_VERSION)
-  this._VIA_PROJECT_DS_URI = 'http://zeus.robots.ox.ac.uk/via/ds/mri_stenosis_may2019/'
+  this._VIA_PROJECT_DS_URI = 'https://zeus.robots.ox.ac.uk/via/ds/mri_stenosis_may2019/'
   this.via_container = via_container;
 
   this.d  = new _via_data();
