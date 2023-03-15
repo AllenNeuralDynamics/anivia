@@ -83,6 +83,15 @@ function _via_load_submodules() {
   };
 
   _via_demo_project['store']['metadata'] = {
+    '1_IDalxRqy': {
+        'vid': '1',
+        'flg': 0,
+        'z': [],
+        'xy': [],
+        'av': {
+          '2':'A white swan in Geneva lake.',
+        },
+    },
     '1-glfwaaX': {
       'vid': '1',
       'flg': 0,
@@ -90,8 +99,16 @@ function _via_load_submodules() {
       'xy': [2, 101, 125, 286, 146],
       'av': {
         '1':'Swan',
-        '2':'A white swan in Geneva lake.',
       }
+    },
+    '2_Z242p4z6': {
+        'vid': '2',
+        'flg': 0,
+        'z': [],
+        'xy': [],
+        'av': {
+            '2': 'Death of Socrates painting by David.',
+        },
     },
     '2_WIpRNLvX': {
       'vid': '2',
@@ -100,7 +117,6 @@ function _via_load_submodules() {
       'xy': [2, 378.921,121.113,84.991,234.435],
       'av': {
         '1':'Socrates',
-        '2':'Death of Socrates painting by David.',
       }
     },
     '2_eA5CqEPf': {
