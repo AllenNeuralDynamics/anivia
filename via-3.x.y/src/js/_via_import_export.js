@@ -117,10 +117,125 @@ _via_import_export.prototype.export_to_file = function(data_format) {
   case 'webvtt':
     this.export_to_webvtt();
     break;
+  case 'coco':
+    this.export_to_coco();
+    break;
 
   default:
     console.warn('Unknown data format: ' + data_format);
   }
+}
+
+_via_import_export.prototype.export_to_coco = function() {
+  return new Promise( function(ok_callback, err_callback) {
+    var coco = {
+      'info': {
+        'year':'',
+        'version':'',
+        'description':'',
+        'contributor':'',
+        'url':'',
+        'date_created':'',
+      },
+      'images': [],
+      'annotations':[],
+      'categories':[],
+      'licenses':[ {'id':0, 'name':'Unknown License', 'url':''} ] // indicates that license is unknown
+    };
+
+    coco['info']['description'] = this.d.store['project']['pname'];
+    coco['info']['date_created'] = this.d.store['project']['created'];
+    coco['info']['contributor'] = this.d.store['project']['creator'];
+    coco['info']['version'] = this.d.store['project']['rev_timestamp'];
+    var COCO_ALLOWED_RSHAPE = [ _VIA_RSHAPE.RECTANGLE, _VIA_RSHAPE.POLYGON ];
+
+    var coco_categories = {};
+    var coco_images_list = {};
+    var annotation_id = 0;
+    for ( var mid in this.d.store['metadata'] ) {
+      var vid = this.d.store['metadata'][mid]['vid'].toString();
+      var fid = this.d.store['view'][vid]['fid_list'][0];
+      var filename = this.d.store['file'][fid]['fname'];
+      const fileloc = this.d.store['file'][fid]['loc'];
+      const file_prefix = this.d.store['config']['file']['loc_prefix'][fileloc];
+      for(var aid in this.d.store['metadata'][mid]['av']) {
+        const aname = this.d.store['attribute'][aid]['aname'];
+        var avalue = this.d.store['metadata'][mid]['av'][aid];
+        const type = this.d.store['attribute'][aid]['type'];
+        if(type === _VIA_ATTRIBUTE_TYPE.SELECT) {
+          const option_id = avalue;
+          avalue = this.d.store['attribute'][aid]['options'][option_id];
+        }
+
+        const anchor_id = this.d.store['attribute'][aid]['anchor_id'];
+        if (anchor_id === 'FILE1_Z0_XY1' ||
+            anchor_id === 'FILE1_Z1_XY1' ) {
+          // check if the category exists in COCO
+          if( !coco_categories.hasOwnProperty(aname) ) {
+            coco_categories[aname] = [];
+          }
+          if(!coco_categories[aname].includes(avalue)) {
+            coco_categories[aname].push(avalue);
+          }
+          var category_id = coco_categories[aname].indexOf(avalue);
+
+          // check if file has been added
+          if( !(filename in coco_images_list) ) {
+            coco_images_list[filename] = fid;
+            coco['images'].push( {
+              'id': parseInt(fid),
+              'license': 0,
+              'file_name': filename,
+              'coco_url': file_prefix + filename,
+              'width': -1,
+              'height': -1,
+              'date_captured': '',
+              'flickr_url': ''
+            });
+          }
+
+          // add this annotation
+          const region = this.d.store['metadata'][mid]['xy'];
+          const bbox = this.via3_region_to_bbox(region);
+          coco['annotations'].push( {
+            'id': annotation_id,
+            'image_id': parseInt(fid),
+            'category_id': category_id,
+            'bbox': bbox,
+            'segmentation': this.via3_region_to_segmentation(region),
+            'iscrowd': false,
+            'area': Number.parseFloat(Number.parseFloat(bbox[2]*bbox[3]).toFixed(3))
+          } );
+
+          annotation_id = annotation_id + 1;
+        }
+      }
+    }
+
+    // add categories to coco
+    for(var aname in coco_categories) {
+      for(var id in coco_categories[aname]) {
+        coco['categories'].push( {
+          'supercategory': aname,
+          'id': parseInt(id),
+          'name': coco_categories[aname][id]
+        });
+      }
+    }
+
+    // trigger download as JSON
+    var filename = 'coco.json';
+    if(this.d.store.project['pid'] === '__VIA_PROJECT_ID__') {
+      filename = this.d.store.project['pname'].replace(' ', '-') + '-coco.json';
+    } else {
+      filename = this.d.store.project['pid'] + '-coco.json';
+      coco['info']['url'] = _VIA_REMOTE_STORE + this.d.store.project['pid'];
+      coco['info']['version'] = this.d.store.project['rev'];
+    }
+    var blob_attr = {type: 'application/json;charset=utf-9'}
+    var coco_blob = new Blob([ JSON.stringify(coco) ], blob_attr);
+    _via_util_download_as_file(coco_blob, filename);
+  }.bind(this) );
 }
 
 _via_import_export.prototype.export_to_via3_csv = function() {
@@ -381,4 +496,56 @@ _via_import_export.prototype.import_from_webvtt = function(webvtt_str, vid, subt
       console.log(err);
     }.bind(this));
   }.bind(this));
+}
+
+_via_import_export.prototype.via3_region_to_segmentation = function(region) {
+  switch(region[0]) {
+  case _VIA_RSHAPE.RECTANGLE:
+    var x = region[1];
+    var y = region[2];
+    var w = region[3];
+    var h = region[4];
+    return [[x, y, x+w, y, x+w, y+h, x, y+h]];
+    break;
+  case _VIA_RSHAPE.POLYGON:
+    var pts = [];
+    for(var i=1; i<region.length; ++i) {
+      pts.push(region[i]);
+    }
+    return pts;
+    break;
+  default:
+    return [[]];
+  }
+}
+
+_via_import_export.prototype.via3_region_to_bbox = function(region) {
+  switch(region[0]) {
+  case _VIA_RSHAPE.RECTANGLE:
+    return [ region[1], region[2], region[3], region[4] ];
+    break;
+  case _VIA_RSHAPE.POLYGON:
+    var extreme_pts = [-Infinity, -Infinity, -Infinity, -Infinity];
+    for(var i=1; i<region.length; i=i+2) {
+      if(region[i] < extreme_pts[0]) {
+        extreme_pts[0] = region[i];
+      }
+      if(region[i+1] < extreme_pts[1]) {
+        extreme_pts[1] = region[i+1];
+      }
+      if(region[i] > extreme_pts[2]) {
+        extreme_pts[2] = region[i];
+      }
+      if(region[i+1] > extreme_pts[3]) {
+        extreme_pts[3] = region[i+1];
+      }
+    }
+    var bbox = [ extreme_pts[0], extreme_pts[1] ];
+    bbox.push( extreme_pts[2] - extreme_pts[0] );
+    bbox.push( extreme_pts[3] - extreme_pts[1] );
+    return bbox;
+    break;
+  default:
+    return [[]];
+  }
 }

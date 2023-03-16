@@ -50,7 +50,7 @@ def init_via_project(clinician_id):
     'file': {
       'loc_prefix': {
         '1':'',
-        '2':'http://zeus.robots.ox.ac.uk/via/mri_stenosis/may2019/images/',
+        '2':'https://zeus.robots.ox.ac.uk/via/mri_stenosis/may2019/images/',
         '3':'',
         '4':'',
       },
