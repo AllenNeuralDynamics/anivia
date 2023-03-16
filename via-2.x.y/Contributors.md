@@ -3,6 +3,9 @@ We welcome all forms of contributions (code update, documentation, etc) from use
 These contributions must adhere to the existing [license](LICENSE) of VIA project.
 Here is the list of current contributions to VIA project.
 
+* via-2.0.12
+  - Filter image list using region attribute value (contributed by Federico Vendramin @fvendramin, merge request 37)
+
 * via-2.0.10
   - COCO format issue (issue 262 merge request by Adrian Boguszewski @adrianboguszewski and Ahthavan Sureshkumar @athav)
   - Polygon points are bigger (issue 258 fixed by Srinivasan Sankar @vasan.shrini)
