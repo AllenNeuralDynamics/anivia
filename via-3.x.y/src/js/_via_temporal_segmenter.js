@@ -1473,6 +1473,7 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_mousedown = function(e) {
     this.metadata_ongoing_update_x = [ this._tmetadata_gtimeline_time2canvas(z[0]),
                                        this._tmetadata_gtimeline_time2canvas(z[1])
                                      ];
+    this._tmetadata_group_gid_draw(gid);
   } else {
     var mindex = this._tmetadata_group_gid_get_mindex_at_time(gid, t);
     if ( mindex !== -1 ) {
