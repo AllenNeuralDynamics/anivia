@@ -262,6 +262,7 @@ to annotate temporal segments of a video: contains 4 rows
     grid-template-rows: auto 1fr;
     height: 100%;
     max-height: 100%;
+    user-select: none;
 }
 
 .temporal_segmenter_container > .tmetadata_container > .gtimeline_container {;
