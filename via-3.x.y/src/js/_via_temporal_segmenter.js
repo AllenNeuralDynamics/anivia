@@ -403,6 +403,17 @@ _via_temporal_segmenter.prototype._tmetadata_init = function() {
   this.tmetadata_container = document.createElement('div');
   this.tmetadata_container.setAttribute('class', 'tmetadata_container');
 
+  this.tmetadata_container.addEventListener('mouseup', function(e) {
+    if(e.target.className === 'gtimeline') {
+      if(this.metadata_resize_is_ongoing || this.metadata_move_is_ongoing) {
+        // this indicates that the mousedown event took place in one of the
+        // timeline (i.e. gtimelime) while the mouseup event took place outside
+        // of it. So, we trigger the mouseup event so that the state gets updated.
+        this._tmetadata_group_gid_mouseup(e);
+      }
+    }
+  }.bind(this));
+
   // group timeline container
   var gheader_container = document.createElement('div');
   gheader_container.setAttribute('class', 'gheader_container');
@@ -1514,6 +1525,7 @@ _via_temporal_segmenter.prototype._tmetadata_group_gid_mouseup = function(e) {
     this.metadata_resize_is_ongoing = false;
     this.metadata_resize_edge_index = -1;
     this.metadata_ongoing_update_x = [0, 0];
+    this._tmetadata_group_gid_draw(this.selected_gid);
     return;
   }
 
