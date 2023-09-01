@@ -171,7 +171,8 @@ function _via_util_load_text_file(text_file, callback_function) {
 }
 
 function _via_util_file_ext(filename) {
-  return filename.substr( filename.lastIndexOf('.') + 1 );
+  // source: https://stackoverflow.com/a/47767860
+  return filename.split(/[#?]/)[0].split('.').pop().trim();
 }
 
 function _via_util_infer_file_loc_from_filename(filename) {
