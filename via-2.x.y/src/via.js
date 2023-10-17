@@ -532,6 +532,16 @@ function sel_local_images() {
   }
 }
 
+function sel_local_slp() {
+  // based on sel_local_images
+  if (invisible_file_input) {
+    invisible_file_input.setAttribute('single', 'single');
+    invisible_file_input.accept   = '.slp';
+    invisible_file_input.onchange = project_file_add_slp;
+    invisible_file_input.click();
+  }
+}
+
 // invoked by menu-item buttons in HTML UI
 function download_all_region_data(type, file_extension) {
   if ( typeof(file_extension) === 'undefined' ) {
@@ -7498,6 +7508,71 @@ function project_add_new_file(filename, size, file_id) {
     _via_img_count += 1;
   }
   return img_id;
+}
+
+// load h5wasm
+let h5wasm;
+(async () => {
+  let module = await import(
+    "https://cdn.jsdelivr.net/npm/h5wasm@latest/dist/esm/hdf5_hl.js");
+  h5wasm = module.h5wasm;
+  // FS = h5wasm.FS;
+  h5wasm.FS = (await h5wasm.ready).FS;
+})();
+
+async function project_file_add_slp(event) {
+  var file = event.target.files[0];
+  let data_filename = file.name;
+  let ab = await file.arrayBuffer();
+  h5wasm.FS.writeFile(data_filename, new Uint8Array(ab));
+  let h5file = new h5wasm.File(data_filename, "r");
+  // console.log(f.keys())
+  // f.close()
+
+  var vidlist = h5file.get("videos_json").to_array();
+  for(var vix=0; vix<vidlist.length; vix++) {
+    var parsed = JSON.parse(vidlist[vix]);
+    console.log(parsed);
+    var vidname = parsed["backend"]["dataset"];
+    console.log(vidname);
+
+    var vid = h5file.get(vidname);
+    var frameloc = vidname.replace("/video", "/frame_numbers")
+    var frames = h5file.get(frameloc).to_array();
+    var added_count = 0;
+    var first_img_id = undefined;
+
+    for(var ix=0; ix<vid.shape[0]; ix++) {
+      // try adding a new image
+      var arr = vid.slice([[ix, ix+1]]);
+      var blob = new Blob([arr], { type: 'image/png' });
+      var url = URL.createObjectURL(blob);
+
+      var img_id = project_add_new_file(vidname + "/" + frames[ix] + ".png");
+      _via_img_src[img_id] = url;
+      set_file_annotations_to_default_value(img_id);
+      added_count += 1;
+      if(!first_img_id) {
+        first_img_id = img_id;
+      }
+    }
+
+    if ( added_count ) {
+      var status_msg = 'Loaded ' + added_count + ' images.';
+      show_message(status_msg);
+      if ( added_count ) {
+        // show first of newly added image
+        var first_img_index = _via_image_id_list.indexOf(first_img_id);
+        _via_show_img( first_img_index );
+      } else {
+        // show original image
+        _via_show_img ( _via_image_index );
+      }
+      update_img_fn_list();
+    }    
+  }
+
+  h5file.close();
 }
 
 function project_file_add_local(event) {
