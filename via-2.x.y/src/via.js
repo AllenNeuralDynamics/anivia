@@ -3191,7 +3191,6 @@ function draw_all_region_id() {
         // region-id is always visible in full
         bgnd_rect_width = strw + char_width;
       } else {
-
         // if text overflows, crop it
         var str_max     = Math.floor((w * annotation_str.length) / strw);
         if ( str_max > 1 ) {
@@ -7522,25 +7521,52 @@ let h5wasm;
 
 async function project_file_add_slp(event) {
   var file = event.target.files[0];
+  
   let data_filename = file.name;
   let ab = await file.arrayBuffer();
   h5wasm.FS.writeFile(data_filename, new Uint8Array(ab));
-  let h5file = new h5wasm.File(data_filename, "r");
+  var h5file = new h5wasm.File(data_filename, "r");
   // console.log(f.keys())
   // f.close()
 
+  var metadata = JSON.parse(h5file.get("metadata").get_attribute("json"));
+  
+  var bodyparts = [];
+  for(var i=0; i<metadata.nodes.length; i++) {
+    bodyparts.push(metadata.nodes[i]['name']);
+  }
+  var n_joints = bodyparts.length;
+  
+  // frames columns: frame_id, video_id, frame_idx, instance_id_start, instance_id_end
+  // build a mapping video_id -> frame_idx -> frame_id
+  var frame_ids_dict = {};
+  var frames = h5file.get("frames").to_array()
+  for(var fix=0; fix<frames.length; fix++) {
+    var row = frames[fix];
+    var frame_id = row[0];
+    var video_id = row[1];
+    var frame_video_id = row[2];
+    if(!frame_ids_dict[video_id]) {
+      frame_ids_dict[video_id] = {};
+    }
+    frame_ids_dict[video_id][frame_video_id] = frame_id;
+  }
+
   var vidlist = h5file.get("videos_json").to_array();
+  var points = h5file.get("points").to_array();
+  
+  var added_count = 0;
+  var first_img_id = undefined;
+  
   for(var vix=0; vix<vidlist.length; vix++) {
     var parsed = JSON.parse(vidlist[vix]);
     console.log(parsed);
-    var vidname = parsed["backend"]["dataset"];
+    var vidname = parsed["backend"]["dataset"].replace("/video", "");
     console.log(vidname);
 
-    var vid = h5file.get(vidname);
-    var frameloc = vidname.replace("/video", "/frame_numbers")
-    var frames = h5file.get(frameloc).to_array();
-    var added_count = 0;
-    var first_img_id = undefined;
+    var vid = h5file.get(vidname + "/video");
+    var frameloc = vidname + "/frame_numbers"
+    var frame_numbers = h5file.get(frameloc).to_array();
 
     for(var ix=0; ix<vid.shape[0]; ix++) {
       // try adding a new image
@@ -7548,30 +7574,68 @@ async function project_file_add_slp(event) {
       var blob = new Blob([arr], { type: 'image/png' });
       var url = URL.createObjectURL(blob);
 
-      var img_id = project_add_new_file(vidname + "/" + frames[ix] + ".png");
+      var frame_idx = frame_numbers[ix];
+
+      // add image
+      var img_id = project_add_new_file(vidname + "/" + frame_idx + ".png");
       _via_img_src[img_id] = url;
       set_file_annotations_to_default_value(img_id);
       added_count += 1;
       if(!first_img_id) {
         first_img_id = img_id;
       }
+
+      // add annotations
+      var frame_id = frame_ids_dict[vix][frame_idx];
+      var frame_row = frames[frame_id];
+      var instance_start = frame_row[3];
+      var instance_end = frame_row[4];
+
+      _via_attributes['region']['name'] = { 'type':'text' };
+      _via_attributes['region']['instance_id'] = { 'type':'text' };
+
+
+      for(var instance_id = instance_start; instance_id < instance_end; instance_id++) {
+        var start = instance_id * n_joints;
+        var end = start + n_joints;
+        for(var point_id = start; point_id < end; point_id++) {
+          var point = points[point_id];
+          var visible = point[2];
+
+          var region_i = new file_region();
+          // it's a point at these coordinates
+          if(visible) {
+            region_i.shape_attributes = {"name": "point", "cx": point[0], "cy": point[1]};
+          } else {
+            // TODO: make the x y missing values distinct
+            region_i.shape_attributes = {"name": "point", "cx": 10, "cy": 10};
+          }
+          // name for label, instance_id for group color
+          region_i.region_attributes = {"name": bodyparts[point_id - start],
+                                        "instance_id": instance_id + ""};
+          // push a region
+          _via_img_metadata[img_id].regions.push(region_i);
+        }
+      }
     }
 
-    if ( added_count ) {
-      var status_msg = 'Loaded ' + added_count + ' images.';
-      show_message(status_msg);
-      if ( added_count ) {
-        // show first of newly added image
-        var first_img_index = _via_image_id_list.indexOf(first_img_id);
-        _via_show_img( first_img_index );
-      } else {
-        // show original image
-        _via_show_img ( _via_image_index );
-      }
-      update_img_fn_list();
-    }    
+    
   }
 
+  if ( added_count ) {
+    var status_msg = 'Loaded ' + added_count + ' images.';
+    show_message(status_msg);
+    if ( added_count ) {
+      // show first of newly added image
+      var first_img_index = _via_image_id_list.indexOf(first_img_id);
+      _via_show_img( first_img_index );
+    } else {
+      // show original image
+      _via_show_img ( _via_image_index );
+    }
+    update_img_fn_list();
+  }
+  
   h5file.close();
 }
 
