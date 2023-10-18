@@ -3186,24 +3186,24 @@ function draw_all_region_id() {
 
     var bgnd_rect_width;
     var strw = _via_reg_ctx.measureText(annotation_str).width;
-    if ( strw > w ) {
-      if ( _via_settings.ui.image.region_label === '__via_region_id__' ) {
-        // region-id is always visible in full
-        bgnd_rect_width = strw + char_width;
-      } else {
-        // if text overflows, crop it
-        var str_max     = Math.floor((w * annotation_str.length) / strw);
-        if ( str_max > 1 ) {
-          annotation_str  = annotation_str.substr(0, str_max-1) + '.';
-          bgnd_rect_width = w;
-        } else {
-          annotation_str  = annotation_str.substr(0, 1) + '.';
-          bgnd_rect_width = 2 * char_width;
-        }
-      }
-    } else {
-      bgnd_rect_width = strw + char_width;
-    }
+    // if ( strw > w ) {
+    //   if ( _via_settings.ui.image.region_label === '__via_region_id__' ) {
+    //     // region-id is always visible in full
+    //     bgnd_rect_width = strw + char_width;
+    //   } else {
+    //     // if text overflows, crop it
+    //     var str_max     = Math.floor((w * annotation_str.length) / strw);
+    //     if ( str_max > 1 ) {
+    //       annotation_str  = annotation_str.substr(0, str_max-1) + '.';
+    //       bgnd_rect_width = w;
+    //     } else {
+    //       annotation_str  = annotation_str.substr(0, 1) + '.';
+    //       bgnd_rect_width = 2 * char_width;
+    //     }
+    //   }
+    // } else {
+    bgnd_rect_width = strw + char_width;
+    // }
 
     if (canvas_reg.shape_attributes['name'] === VIA_REGION_SHAPE.POLYGON ||
         canvas_reg.shape_attributes['name'] === VIA_REGION_SHAPE.POLYLINE) {
