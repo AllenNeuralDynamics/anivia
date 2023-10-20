@@ -550,7 +550,11 @@ function download_all_region_data(type, file_extension) {
   // Javascript strings (DOMString) is automatically converted to utf-8
   // see: https://developer.mozilla.org/en-US/docs/Web/API/Blob/Blob
   pack_via_metadata(type).then( function(data) {
-    var blob_attr = {type: 'text/'+file_extension+';charset=utf-8'};
+    if(type == "slp") { // slp files are hdf5
+      var blob_attr = {type: 'application/x-hdf5'};
+    } else { // everything else is text
+      var blob_attr = {type: 'text/'+file_extension+';charset=utf-8'};
+    }
     var all_region_data_blob = new Blob(data, blob_attr);
 
     var filename = 'via_export';
@@ -559,7 +563,7 @@ function download_all_region_data(type, file_extension) {
        _via_settings['project']['name'] !== '') {
       filename = _via_settings['project']['name'];
     }
-    if ( file_extension !== 'csv' || file_extension !== 'json' ) {
+    if ( file_extension !== 'csv' || file_extension !== 'json' ) { // always true?
       filename += '_' + type + '.' + file_extension;
     }
     save_data_to_local_file(all_region_data_blob, filename);
@@ -1260,6 +1264,11 @@ function pack_via_metadata(return_type) {
       ok_callback(csvdata);
     }
 
+    if ( return_type == 'slp' ) {
+      var slp = export_project_to_slp_format();
+      ok_callback([slp]);
+    }
+
     // see http://cocodataset.org/#format-data
     if( return_type === 'coco' ) {
       img_stat_set_all().then( function(ok) {
@@ -1273,6 +1282,203 @@ function pack_via_metadata(return_type) {
       ok_callback( [ JSON.stringify(_via_img_metadata) ] );
     }
   }.bind(this));
+}
+
+function export_project_to_slp_format() {
+  // should return hdf5 file of the project
+
+  // NOTE: this function assumes points have name and instance_id attributes associated with them
+  // also assumes that always have n_joints points associated with each instance
+
+  var MISSING_CORNER_LENGTH = 50;
+
+  var videos_json = [];
+  var videos = {};
+  var frames = [];
+  var instances = [];
+  var points = [];
+  var bodyparts = [];
+
+
+  // get the list of bodyparts for metadata
+  var img_id = _via_image_id_list[0];
+  var regions = _via_img_metadata[img_id].regions;
+  var fill_bodyparts_id = undefined;
+  for(var region_index = 0; region_index < regions.length; region_index++) {
+    var region = regions[region_index];
+    var instance_id = region.region_attributes['instance_id'];
+    if(!fill_bodyparts_id) {
+      fill_bodyparts_id = instance_id;
+    }
+    if(fill_bodyparts_id == instance_id) {
+      bodyparts.push(region.region_attributes['name']);
+    }
+  }
+  var n_joints = bodyparts.length;
+
+  // loop over images to extract points, frames, and instances
+  var instance_num = 0;
+  var frame_id = 0;
+
+  for( var img_index in _via_image_id_list ) {
+    var img_id = _via_image_id_list[img_index];
+    var metadata = _via_img_metadata[img_id]
+    var filename = metadata.filename;
+    var fsplit = filename.split("/");
+    var vidnum = parseInt(fsplit[0].replace("video", ""));
+    var framenum = parseInt(fsplit[1]);
+
+    // add videos
+    if(!videos[vidnum]) {
+      videos[vidnum] = {'frame_numbers': []};
+      videos_json.push({"backend": {
+        filename:".",
+        dataset:"video" + vidnum + "/video",
+        input_format:"channels_last",
+        convert_range:false }
+      });
+    }
+    // add frame number to videos
+    videos[vidnum]['frame_numbers'].push(framenum)
+
+    // get the points
+    var regions = metadata.regions;
+    var instance_dict = {};
+    for(var region_index = 0; region_index < regions.length; region_index++) {
+      var region = regions[region_index];
+      var instance_id = region.region_attributes['instance_id'];
+      instance_dict[instance_id] = true;
+      // TODO: modify interface to have a separate space for invisible points
+      //       or another way to mark point as missing
+      var invisible = ((region.shape_attributes['cx'] < MISSING_CORNER_LENGTH) &&
+                       (region.shape_attributes['cy'] < MISSING_CORNER_LENGTH));
+      points.push( {
+        x: region.shape_attributes['cx'],
+        y: region.shape_attributes['cy'],
+        visible: (!invisible) * 1.0
+      });
+    }
+
+    // frames
+    var num_instances = Object.keys(instance_dict).length;
+    frames.push({
+      frame_id: frame_id,
+      video: vidnum,
+      frame_idx: framenum,
+      instance_id_start: instance_num,
+      instance_id_end: instance_num + num_instances
+    })
+
+    // instances
+    for ( var _ in Object.keys(instance_dict) ) {
+      instances.push({
+        instance_id: instance_num,
+        frame_id: frame_id,
+        point_id_start: instance_num * n_joints,
+        point_id_end: (instance_num+1) * n_joints
+      });
+      instance_num++;
+    }
+
+    frame_id += 1;
+  }
+
+  // ----
+  // reformat all the data into an hdf5 file in SLP format
+  var outf = new h5wasm.File("data_export.slp", "w");
+  console.log(outf);
+
+  function dict_to_arr(dict, names) {
+    // convenience function to get keys from dict, with constants as needed
+    var arr = [];
+    for(var i=0; i<names.length; i++) {
+      var key = names[i];
+      if(typeof key == 'string') {
+        arr.push(dict[key]);
+      } else{
+        arr.push(key);
+      }
+    }
+    return arr;
+  }
+
+  // frames
+  var frame_columns = ["frame_id", "video", "frame_idx",
+                       "instance_id_start",
+                       "instance_id_end"]
+  var frame_arr = [];
+  for(var frame_index=0; frame_index < frames.length; frame_index++) {
+    var row = dict_to_arr(frames[frame_index], frame_columns);
+    frame_arr.push(row);
+  }
+  outf.create_dataset({name: "frames", data: frame_arr, dtype: "<i"});
+
+  // instances
+  var instance_columns = [ "instance_id", 0, "frame_id", 0,
+                           -1, -1, 0, "point_id_start", "point_id_end"];
+  var instance_arr = [];
+  for(var instance_index=0; instance_index < instances.length; instance_index++) {
+    var row = dict_to_arr(instances[instance_index], instance_columns);
+    instance_arr.push(...row);
+  }
+  outf.create_dataset({name: "instances", data: instance_arr,
+                       shape: [instances.length, instance_columns.length],
+                       dtype: "<i"});
+
+  // metadata
+  metadata = {
+    "version": "2.0.0", "nodes": [], "videos": [],
+    "tracks": [], "suggestions": [],
+    "negative_anchors": {}, "provenance": {},
+    "skeletons": [{nodes: [], links: [], directed: true, multigraph: true,
+                   graph: {name: "Skeleton-1", num_edges_inserted: 0}}]
+  }
+  for(var bp_index=0; bp_index<bodyparts.length; bp_index++) {
+    metadata["nodes"].push({
+      name: bodyparts[bp_index],
+      weight: 1.0
+    });
+    metadata["skeletons"][0]["nodes"].push({id: bp_index});
+  }
+  outf.create_group("metadata");
+
+  outf.get("metadata").create_attribute("format_id", 1.1);
+  outf.get("metadata").create_attribute("json", JSON.stringify(metadata));
+
+  // points
+  var point_columns = [ "x", "y", "visible", 1.0];
+  var point_arr = [];
+  for(var point_index=0; point_index < points.length; point_index++) {
+    var row = dict_to_arr(points[point_index], point_columns);
+    point_arr.push(...row);
+  }
+  console.log(point_arr);
+  outf.create_dataset({name: "points", data: point_arr,
+                       shape: [points.length, point_columns.length], dtype: "<f"});
+
+  // videos_json
+  var videos_json_arr = []
+  for(var vidnum=0; vidnum < videos_json.length; vidnum++) {
+    videos_json_arr.push(JSON.stringify(videos_json[vidnum]));
+  }
+  outf.create_dataset({name: "videos_json", data: videos_json_arr})
+
+  // video#
+  for(var vidnum=0; vidnum < videos_json.length; vidnum++) {
+    var vid = videos[vidnum];
+    outf.create_group("video" + vidnum);
+    outf.get("video" + vidnum).create_dataset({
+      name: "frame_numbers",
+      data: vid['frame_numbers'],
+      dtype: "<i"});
+  }
+
+  outf.create_dataset({name: "pred_points", data: [], dtype: "<f"});
+
+  outf.flush();
+  var bin = h5wasm.FS.readFile(outf.filename);
+  outf.close()
+  return bin;
 }
 
 function export_project_to_coco_format() {
@@ -7515,7 +7721,6 @@ let h5wasm;
   let module = await import(
     "https://cdn.jsdelivr.net/npm/h5wasm@latest/dist/esm/hdf5_hl.js");
   h5wasm = module.h5wasm;
-  // FS = h5wasm.FS;
   h5wasm.FS = (await h5wasm.ready).FS;
 })();
 
@@ -7531,10 +7736,18 @@ async function project_file_add_slp(event) {
 
   var metadata = JSON.parse(h5file.get("metadata").get_attribute("json"));
   
-  var bodyparts = [];
+  var nodes = [];
   for(var i=0; i<metadata.nodes.length; i++) {
-    bodyparts.push(metadata.nodes[i]['name']);
+    nodes.push(metadata.nodes[i]['name']);
   }
+
+  var skeleton_nodes = metadata['skeletons'][0]['nodes'];
+  var bodyparts = [];
+  for(var i=0; i<skeleton_nodes.length; i++) {
+    var id = skeleton_nodes[i]['id'];
+    bodyparts.push(nodes[id]);
+  }
+
   var n_joints = bodyparts.length;
   
   // frames columns: frame_id, video_id, frame_idx, instance_id_start, instance_id_end
@@ -7577,7 +7790,7 @@ async function project_file_add_slp(event) {
       var frame_idx = frame_numbers[ix];
 
       // add image
-      var img_id = project_add_new_file(vidname + "/" + frame_idx + ".png");
+      var img_id = project_add_new_file(vidname + "/" + frame_idx);
       _via_img_src[img_id] = url;
       set_file_annotations_to_default_value(img_id);
       added_count += 1;
@@ -7636,7 +7849,8 @@ async function project_file_add_slp(event) {
     update_img_fn_list();
   }
   
-  h5file.close();
+  // h5file.close();
+  window.h5file = h5file;
 }
 
 function project_file_add_local(event) {
