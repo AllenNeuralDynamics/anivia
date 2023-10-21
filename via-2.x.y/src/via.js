@@ -550,7 +550,7 @@ function download_all_region_data(type, file_extension) {
   // Javascript strings (DOMString) is automatically converted to utf-8
   // see: https://developer.mozilla.org/en-US/docs/Web/API/Blob/Blob
   pack_via_metadata(type).then( function(data) {
-    if(type == "slp") { // slp files are hdf5
+    if(type == "slp" || type == "img_slp") { // slp files are hdf5
       var blob_attr = {type: 'application/x-hdf5'};
     } else { // everything else is text
       var blob_attr = {type: 'text/'+file_extension+';charset=utf-8'};
@@ -1264,13 +1264,15 @@ function pack_via_metadata(return_type) {
       ok_callback(csvdata);
     }
 
-    if ( return_type == 'slp' ) {
-      var slp = export_project_to_slp_format();
-      ok_callback([slp]);
+    else if ( (return_type == 'slp') || (return_type == 'img_slp') ) {
+      export_project_to_slp_format(return_type == 'img_slp')
+        .then(function(data) {
+          ok_callback([data]);
+      });
     }
 
     // see http://cocodataset.org/#format-data
-    if( return_type === 'coco' ) {
+    else if( return_type === 'coco' ) {
       img_stat_set_all().then( function(ok) {
         var coco = export_project_to_coco_format();
         ok_callback( [ coco ] );
@@ -1284,7 +1286,7 @@ function pack_via_metadata(return_type) {
   }.bind(this));
 }
 
-function export_project_to_slp_format() {
+async function export_project_to_slp_format(should_add_images) {
   // should return hdf5 file of the project
 
   // NOTE: this function assumes points have name and instance_id attributes associated with them
@@ -1328,9 +1330,13 @@ function export_project_to_slp_format() {
     var vidnum = parseInt(fsplit[0].replace("video", ""));
     var framenum = parseInt(fsplit[1]);
 
+
     // add videos
     if(!videos[vidnum]) {
-      videos[vidnum] = {'frame_numbers': []};
+      videos[vidnum] = {
+        'frame_numbers': [],
+        'images': []
+      };
       videos_json.push({"backend": {
         filename:".",
         dataset:"video" + vidnum + "/video",
@@ -1340,6 +1346,13 @@ function export_project_to_slp_format() {
     }
     // add frame number to videos
     videos[vidnum]['frame_numbers'].push(framenum)
+
+    // get the frame, if wanted
+    if(should_add_images) {
+      var url = _via_img_src[img_id];
+      var promise = fetch_url_to_array_buffer(url);
+      videos[vidnum]['images'].push(promise);
+    }
 
     // get the points
     var regions = metadata.regions;
@@ -1385,7 +1398,8 @@ function export_project_to_slp_format() {
 
   // ----
   // reformat all the data into an hdf5 file in SLP format
-  var outf = new h5wasm.File("data_export.slp", "w");
+  var fname = new Date().toString() + ".h5";
+  var outf = new h5wasm.File(fname, "w");
   console.log(outf);
 
   function dict_to_arr(dict, names) {
@@ -1409,9 +1423,11 @@ function export_project_to_slp_format() {
   var frame_arr = [];
   for(var frame_index=0; frame_index < frames.length; frame_index++) {
     var row = dict_to_arr(frames[frame_index], frame_columns);
-    frame_arr.push(row);
+    frame_arr.push(...row);
   }
-  outf.create_dataset({name: "frames", data: frame_arr, dtype: "<i"});
+  outf.create_dataset({name: "frames", data: frame_arr,
+                       shape: [frames.length, frame_columns.length],
+                       dtype: "<i"});
 
   // instances
   var instance_columns = [ "instance_id", 0, "frame_id", 0,
@@ -1473,13 +1489,57 @@ function export_project_to_slp_format() {
       dtype: "<i"});
   }
 
+  // video images
+  if(should_add_images) {
+    for(var vidnum=0; vidnum < videos_json.length; vidnum++) {
+      var image_promises = videos[vidnum]['images'];
+      console.log(image_promises[0]);
+      var images = [];
+      var max_frame_size = 0;
+      for(var imnum=0; imnum < image_promises.length; imnum++) {
+        const result = await image_promises[imnum];
+        images.push(result);
+        max_frame_size = Math.max(max_frame_size, result.length);
+      }
+      console.log(max_frame_size);
+
+      var images_flat = new Uint8Array(max_frame_size * images.length);
+      images_flat.fill(0);
+      for(var imnum=0; imnum < images.length; imnum++) {
+        var img = images[imnum];
+        images_flat.set(images[imnum], imnum * max_frame_size);
+      }
+
+      console.log(images_flat.length);
+
+
+      outf.get("video" + vidnum).create_dataset({
+        name: "video",
+        shape: [images.length, max_frame_size],
+        data: images_flat,
+        dtype: "<b",
+        chunks: [Math.min(100, images.length), Math.min(100, max_frame_size)],
+        compression: "gzip"
+      })
+    }
+  }
+
   outf.create_dataset({name: "pred_points", data: [], dtype: "<f"});
 
   outf.flush();
   var bin = h5wasm.FS.readFile(outf.filename);
   outf.close()
+  h5wasm.FS.unlink(outf.filename);
   return bin;
 }
+
+async function fetch_url_to_array_buffer(url) {
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  const uint8Array = new Uint8Array(arrayBuffer);
+  return uint8Array;
+}
+
 
 function export_project_to_coco_format() {
   var coco = { 'info':{}, 'images':[], 'annotations':[], 'licenses':[], 'categories':[] };
@@ -7733,6 +7793,8 @@ async function project_file_add_slp(event) {
   var h5file = new h5wasm.File(data_filename, "r");
   // console.log(f.keys())
   // f.close()
+
+  window.h5file = h5file;
 
   var metadata = JSON.parse(h5file.get("metadata").get_attribute("json"));
   
