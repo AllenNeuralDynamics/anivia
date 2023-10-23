@@ -1482,8 +1482,9 @@ async function export_project_to_slp_format(should_add_images) {
   // video#
   for(var vidnum=0; vidnum < videos_json.length; vidnum++) {
     var vid = videos[vidnum];
-    outf.create_group("video" + vidnum);
-    outf.get("video" + vidnum).create_dataset({
+    var key = "video" + vidnum;
+    outf.create_group(key);
+    outf.get(key).create_dataset({
       name: "frame_numbers",
       data: vid['frame_numbers'],
       dtype: "<i"});
@@ -1521,6 +1522,7 @@ async function export_project_to_slp_format(should_add_images) {
         chunks: [Math.min(100, images.length), Math.min(100, max_frame_size)],
         compression: "gzip"
       })
+      outf.get("video" + vidnum + "/video").create_attribute("format", "png");
     }
   }
 
