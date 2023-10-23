@@ -7794,8 +7794,6 @@ async function project_file_add_slp(event) {
   // console.log(f.keys())
   // f.close()
 
-  // window.h5file = h5file;
-
   var metadata = JSON.parse(h5file.get("metadata").get_attribute("json"));
   
   var nodes = [];
@@ -7912,7 +7910,6 @@ async function project_file_add_slp(event) {
   }
   
   h5file.close();
-  // window.h5file = h5file;
 }
 
 function project_file_add_local(event) {
