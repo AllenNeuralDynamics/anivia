@@ -1431,7 +1431,7 @@ async function export_project_to_slp_format(should_add_images) {
 
   // instances
   var instance_columns = [ "instance_id", 0, "frame_id", 0,
-                           -1, -1, 0, "point_id_start", "point_id_end"];
+                           -1, -1, -1, "point_id_start", "point_id_end"];
   var instance_arr = [];
   for(var instance_index=0; instance_index < instances.length; instance_index++) {
     var row = dict_to_arr(instances[instance_index], instance_columns);
@@ -7794,7 +7794,7 @@ async function project_file_add_slp(event) {
   // console.log(f.keys())
   // f.close()
 
-  window.h5file = h5file;
+  // window.h5file = h5file;
 
   var metadata = JSON.parse(h5file.get("metadata").get_attribute("json"));
   
@@ -7911,8 +7911,8 @@ async function project_file_add_slp(event) {
     update_img_fn_list();
   }
   
-  // h5file.close();
-  window.h5file = h5file;
+  h5file.close();
+  // window.h5file = h5file;
 }
 
 function project_file_add_local(event) {
