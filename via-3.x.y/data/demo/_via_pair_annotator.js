@@ -1,1 +1,0 @@
-// images are loaded from Wikimedia Commons URL
