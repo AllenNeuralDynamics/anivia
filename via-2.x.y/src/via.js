@@ -372,6 +372,8 @@ function _via_init() {
     }, 100);
   }
 
+  select_region_shape('point');
+
 }
 
 function _via_init_reg_canvas_context() {
@@ -1923,14 +1925,14 @@ function _via_load_canvas_regions() {
 
 // updates currently selected region shape
 function select_region_shape(sel_shape_name) {
-  for ( var shape_name in VIA_REGION_SHAPE ) {
-    var ui_element = document.getElementById('region_shape_' + VIA_REGION_SHAPE[shape_name]);
-    ui_element.classList.remove('selected');
-  }
+  // for ( var shape_name in VIA_REGION_SHAPE ) {
+    // var ui_element = document.getElementById('region_shape_' + VIA_REGION_SHAPE[shape_name]);
+    // ui_element.classList.remove('selected');
+  // }
 
   _via_current_shape = sel_shape_name;
-  var ui_element = document.getElementById('region_shape_' + _via_current_shape);
-  ui_element.classList.add('selected');
+  // var ui_element = document.getElementById('region_shape_' + _via_current_shape);
+  // ui_element.classList.add('selected');
 
   switch(_via_current_shape) {
   case VIA_REGION_SHAPE.RECT: // Fall-through
@@ -1945,16 +1947,16 @@ function select_region_shape(sel_shape_name) {
     _via_is_user_drawing_polygon = false;
     _via_current_polygon_region_id = -1;
 
-    show_message('[Single Click] to define polygon/polyline vertices, ' +
-                 '[Backspace] to delete last vertex, [Enter] to finish, [Esc] to cancel drawing.' );
+    // show_message('[Single Click] to define polygon/polyline vertices, ' +
+    //              '[Backspace] to delete last vertex, [Enter] to finish, [Esc] to cancel drawing.' );
     break;
 
   case VIA_REGION_SHAPE.POINT:
-    show_message('Press single click to define points (or landmarks)');
+    // show_message('Press single click to define points (or landmarks)');
     break;
 
   default:
-    show_message('Unknown shape selected!');
+    // show_message('Unknown shape selected!');
     break;
   }
 }
@@ -2069,6 +2071,19 @@ function _via_reg_canvas_mousedown_handler(e) {
   _via_region_edge = is_on_region_corner(_via_click_x0, _via_click_y0);
   var region_id = is_inside_region(_via_click_x0, _via_click_y0);
 
+  if ( region_id >= 0 &&
+       _via_current_shape == VIA_REGION_SHAPE.POINT ) {
+    // set up the point so we can move it as soon as you click on it
+    _via_user_sel_region_id     = region_id;
+    _via_is_region_selected     = true;
+    _via_is_user_moving_region  = false;
+    _via_is_user_drawing_region = false;
+
+    annotation_editor_clear_row_highlight();
+    toggle_all_regions_selection(false);
+    set_region_select_state(region_id, true);
+  }
+
   if ( _via_is_region_selected ) {
     // check if user clicked on the region boundary
     if ( _via_region_edge[1] > 0 ) {
@@ -2163,8 +2178,8 @@ function _via_reg_canvas_mouseup_handler(e) {
       } else {
         // user clicking inside an already selected region
         // indicates that the user intends to draw a nested region
-        toggle_all_regions_selection(false);
-        _via_is_region_selected = false;
+        // toggle_all_regions_selection(false);
+        // _via_is_region_selected = false;
 
         switch (_via_current_shape) {
         case VIA_REGION_SHAPE.POLYLINE: // handled by case for POLYGON
@@ -2183,17 +2198,17 @@ function _via_reg_canvas_mouseup_handler(e) {
 
         case VIA_REGION_SHAPE.POINT:
           // user has marked a landmark point
-          var point_region = new file_region();
-          point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
-          point_region.shape_attributes['cx'] = Math.round(_via_click_x0 * _via_canvas_scale);
-          point_region.shape_attributes['cy'] = Math.round(_via_click_y0 * _via_canvas_scale);
-          _via_img_metadata[_via_image_id].regions.push(point_region);
+          // var point_region = new file_region();
+          // point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
+          // point_region.shape_attributes['cx'] = Math.round(_via_click_x0 * _via_canvas_scale);
+          // point_region.shape_attributes['cy'] = Math.round(_via_click_y0 * _via_canvas_scale);
+          // _via_img_metadata[_via_image_id].regions.push(point_region);
 
-          var canvas_point_region = new file_region();
-          canvas_point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
-          canvas_point_region.shape_attributes['cx'] = Math.round(_via_click_x0);
-          canvas_point_region.shape_attributes['cy'] = Math.round(_via_click_y0);
-          _via_canvas_regions.push(canvas_point_region);
+          // var canvas_point_region = new file_region();
+          // canvas_point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
+          // canvas_point_region.shape_attributes['cx'] = Math.round(_via_click_x0);
+          // canvas_point_region.shape_attributes['cy'] = Math.round(_via_click_y0);
+          // _via_canvas_regions.push(canvas_point_region);
           break;
         }
         annotation_editor_update_content();
@@ -4101,9 +4116,9 @@ function _via_update_ui_components() {
       _via_is_window_resized = true;
       _via_show_img(_via_image_index);
 
-      if (_via_is_canvas_zoomed) {
-        reset_zoom_level();
-      }
+      // if (_via_is_canvas_zoomed) {
+      //   reset_zoom_level();
+      // }
     }
     break;
   }
