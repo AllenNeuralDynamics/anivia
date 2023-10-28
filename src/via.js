@@ -313,6 +313,12 @@ var VIA_FLOAT_PRECISION = 3; // number of decimal places to include in float val
 var VIA_COCO_EXPORT_RSHAPE = ['rect', 'circle', 'ellipse', 'polygon', 'point'];
 var VIA_COCO_EXPORT_ATTRIBUTE_TYPE = [VIA_ATTRIBUTE_TYPE.DROPDOWN,
                                       VIA_ATTRIBUTE_TYPE.RADIO];
+
+// Variables for animal annotation
+var _anivia_bodyparts = []; // list of bodyparts within each animal
+var _anivia_instance_id = 0; // current instance id
+var _anivia_num_instances = 0; // number of instances, updated by image
+
 //
 // Data structure to store metadata about file and regions
 //
@@ -359,10 +365,16 @@ function _via_init() {
 
   show_single_image_view();
   init_leftsidebar_accordion();
-  attribute_update_panel_set_active_button();
+  // attribute_update_panel_set_active_button();
   annotation_editor_set_active_button();
   init_message_panel();
 
+  // set up region label and color, for animal annotation
+  _via_attributes['region']['name'] = { 'type':'text' };
+  _via_attributes['region']['instance_id'] = { 'type':'text' };
+  _via_settings.ui.image.region_label = 'name';
+  _via_settings.ui.image.region_color = 'instance_id';
+  
   // run attached sub-modules (if any)
   // e.g. demo modules
   if (typeof _via_load_submodules === 'function') {
@@ -373,7 +385,6 @@ function _via_init() {
   }
 
   select_region_shape('point');
-
 }
 
 function _via_init_reg_canvas_context() {
@@ -1305,8 +1316,18 @@ async function export_project_to_slp_format(should_add_images) {
 
 
   // get the list of bodyparts for metadata
-  var img_id = _via_image_id_list[0];
-  var regions = _via_img_metadata[img_id].regions;
+  var img_id = undefined;
+  var regions = [];
+  // -- find the first image with regions
+  for(var i=0; i < _via_image_id_list.length; i++) {
+    var test_img_id = _via_image_id_list[i];
+    var test_regions = _via_img_metadata[test_img_id].regions;
+    if(test_regions.length > regions.length) {
+      regions = test_regions;
+      img_id = test_img_id;
+    }
+  }
+
   var fill_bodyparts_id = undefined;
   for(var region_index = 0; region_index < regions.length; region_index++) {
     var region = regions[region_index];
@@ -1357,6 +1378,7 @@ async function export_project_to_slp_format(should_add_images) {
     }
 
     // get the points
+    // TODO: should be reordered into a dictionary to handle different order of bodyparts
     var regions = metadata.regions;
     var instance_dict = {};
     for(var region_index = 0; region_index < regions.length; region_index++) {
@@ -1521,7 +1543,7 @@ async function export_project_to_slp_format(should_add_images) {
         shape: [images.length, max_frame_size],
         data: images_flat,
         dtype: "<b",
-        chunks: [Math.min(100, images.length), Math.min(100, max_frame_size)],
+        chunks: [Math.min(5, images.length), Math.min(15000, max_frame_size)],
         compression: "gzip"
       })
       outf.get("video" + vidnum + "/video").create_attribute("format", "png");
@@ -1844,7 +1866,14 @@ function _via_regions_group_color_init() {
     }
     var color_index = 0;
     for ( avalue in _via_canvas_regions_group_color ) {
-      _via_canvas_regions_group_color[avalue] = VIA_REGION_COLOR_LIST[ color_index % VIA_REGION_COLOR_LIST.length ];
+      var color;
+      if( avalue == (_anivia_instance_id + "") ) {
+        color = "#f0f0f0";
+      } else {
+        color = VIA_REGION_COLOR_LIST[ color_index % VIA_REGION_COLOR_LIST.length ] + "ee";
+      }
+      _via_canvas_regions_group_color[avalue] = color;
+
       color_index = color_index + 1;
     }
   }
@@ -2448,11 +2477,38 @@ function _via_reg_canvas_mouseup_handler(e) {
             break;
 
           case VIA_REGION_SHAPE.POINT:
+
+            var point_name = undefined;
+
+            // add the attribute for the bodyparts
+            if(_anivia_bodyparts.length > 0) {
+              // loop through the attributes
+              var regions = _via_img_metadata[_via_image_id].regions;
+              var bodypart_set = new Set(_anivia_bodyparts);
+              for(var i=0; i<regions.length; i++) {
+                var region_name = regions[i].region_attributes['name'];
+                var region_instance = parseInt(regions[i].region_attributes['instance_id']);
+                if(region_instance == _anivia_instance_id) {
+                  bodypart_set.delete(region_name);
+                }
+              }
+
+              if(bodypart_set.size == 0) {
+                // all the bodyparts already placed!
+                show_message("Cannot add a point: all the bodyparts have already been placed!");
+                break;
+              } else {
+                point_name = bodypart_set.values().next().value;
+              }
+            }
+
             // user has marked a landmark point
             var point_region = new file_region();
             point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
             point_region.shape_attributes['cx'] = Math.round(_via_click_x0 * _via_canvas_scale);
             point_region.shape_attributes['cy'] = Math.round(_via_click_y0 * _via_canvas_scale);
+            point_region.region_attributes['name'] = point_name;
+            point_region.region_attributes['instance_id'] = _anivia_instance_id + "";
             var region_count = _via_img_metadata[_via_image_id].regions.push(point_region);
             var new_region_id = region_count - 1;
             set_region_annotations_to_default_value( new_region_id );
@@ -2462,6 +2518,7 @@ function _via_reg_canvas_mouseup_handler(e) {
             canvas_point_region.shape_attributes['cx'] = Math.round(_via_click_x0);
             canvas_point_region.shape_attributes['cy'] = Math.round(_via_click_y0);
             _via_canvas_regions.push(canvas_point_region);
+
 
             annotation_editor_update_content();
             break;
@@ -4166,17 +4223,30 @@ function _via_handle_global_keydown_event(e) {
     return;
   }
 
-  if ( e.key === 'ArrowUp' ) {
-    region_visualisation_update('region_label', '__via_region_id__', 1);
+  if ( e.key == 'ArrowUp' ) {
+    update_instance_selection(1);
     e.preventDefault();
     return;
   }
 
-  if ( e.key === 'ArrowDown' ) {
-    region_visualisation_update('region_color', '__via_default_region_color__', -1);
+  if ( e.key == 'ArrowDown' ) {
+    update_instance_selection(-1);
     e.preventDefault();
     return;
   }
+
+  // we don't change the region labels and colors anymore
+  // if ( e.key === 'ArrowUp' ) {
+  //   region_visualisation_update('region_label', '__via_region_id__', 1);
+  //   e.preventDefault();
+  //   return;
+  // }
+
+  // if ( e.key === 'ArrowDown' ) {
+  //   region_visualisation_update('region_color', '__via_default_region_color__', -1);
+  //   e.preventDefault();
+  //   return;
+  // }
 
 
   if ( e.key === 'Home') {
@@ -5066,6 +5136,24 @@ function region_visualisation_update(type, default_id, next_offset) {
       show_message(type_str + ' set to region attribute [' + _via_settings.ui.image[type] + ']');
     }
   }
+}
+
+function select_instance_number(num) {
+  _anivia_instance_id = num;
+  _via_regions_group_color_init();
+  _via_redraw_reg_canvas();
+  show_message("selected instance " + num);
+}
+
+function update_instance_selection(add) {
+  var new_id = _anivia_instance_id + add;
+  if(new_id >= _anivia_num_instances) {
+    new_id = 0;
+  }
+  if(new_id < 0) {
+    new_id = _anivia_num_instances - 1;
+  }
+  select_instance_number(new_id);
 }
 
 //
@@ -7825,6 +7913,10 @@ async function project_file_add_slp(event) {
     bodyparts.push(nodes[id]);
   }
 
+  _anivia_bodyparts = bodyparts;
+  
+  console.log("bodyparts: ", bodyparts);
+
   var n_joints = bodyparts.length;
   
   // frames columns: frame_id, video_id, frame_idx, instance_id_start, instance_id_end
@@ -7850,7 +7942,7 @@ async function project_file_add_slp(event) {
   
   for(var vix=0; vix<vidlist.length; vix++) {
     var parsed = JSON.parse(vidlist[vix]);
-    console.log(parsed);
+    // console.log(parsed);
     var vidname = parsed["backend"]["dataset"].replace("/video", "");
     console.log(vidname);
 
@@ -7859,7 +7951,7 @@ async function project_file_add_slp(event) {
     var frame_numbers = h5file.get(frameloc).to_array();
 
     for(var ix=0; ix<vid.shape[0]; ix++) {
-      // try adding a new image
+      // try adding a  new image
       var arr = vid.slice([[ix, ix+1]]);
       var blob = new Blob([arr], { type: 'image/png' });
       var url = URL.createObjectURL(blob);
@@ -7881,9 +7973,6 @@ async function project_file_add_slp(event) {
       var instance_start = frame_row[3];
       var instance_end = frame_row[4];
 
-      _via_attributes['region']['name'] = { 'type':'text' };
-      _via_attributes['region']['instance_id'] = { 'type':'text' };
-
 
       for(var instance_id = instance_start; instance_id < instance_end; instance_id++) {
         var start = instance_id * n_joints;
@@ -7902,7 +7991,7 @@ async function project_file_add_slp(event) {
           }
           // name for label, instance_id for group color
           region_i.region_attributes = {"name": bodyparts[point_id - start],
-                                        "instance_id": instance_id + ""};
+                                        "instance_id": (instance_id - instance_start) + ""};
           // push a region
           _via_img_metadata[img_id].regions.push(region_i);
         }
@@ -9647,6 +9736,20 @@ function _via_show_img(img_index) {
       console.log('_via_img_buffer_add_image() failed for file: ' + _via_image_filename_list[err_img_index]);
     });
   }
+
+  recalculate_anivia_instance_nums(img_id);
+}
+
+
+function recalculate_anivia_instance_nums(img_id) {
+  var regions = _via_img_metadata[img_id].regions;
+  var instance_dict = {};
+  for(var i=0; i<regions.length; i++) {
+    var instance_id = parseInt(regions[i].region_attributes.instance_id);
+    instance_dict[instance_id] = true;
+  }
+  _anivia_num_instances = Object.keys(instance_dict).length;
+  _anivia_instance_id = 0; // reset instance id
 }
 
 function _via_buffer_hide_current_image() {

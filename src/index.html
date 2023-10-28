@@ -317,6 +317,20 @@
           <span class="text_button" onclick="leftsidebar_toggle()" title="Show/hide this toolbar panel">&ltrif;</span>
         </div>
 
+
+        <!-- <button class="leftsidebar_accordion active">Instances</button>
+             <div class="leftsidebar_accordion_panel show">
+             <ul class="region_shape">
+             <li id="region_shape_rect" class="selected" onclick="select_instance_number(0)" title="Select instance 0"><svg height="32" viewbox="0 0 32 32"><use xlink:href="#shape_rectangle"></use></svg></li>
+             <li id="region_shape_circle" onclick="select_instance_number(1)" title="Select instance 1"><svg height="32" viewbox="0 0 32 32"><use xlink:href="#shape_circle"></use></svg></li>
+             <li id="region_shape_ellipse" onclick="select_instance_number(2)" title="Select instance 2"><svg height="32" viewbox="0 0 32 32"><use xlink:href="#shape_ellipse"></use></svg></li>
+             <li id="region_shape_polygon" onclick="select_instance_number(3)" title="Select instance 3"><svg height="32" viewbox="0 0 32 32"><use xlink:href="#shape_polygon"></use></svg></li>
+             <li id="region_shape_point" onclick="select_instance_number(4)" title="Select instance 4"><svg height="32" viewbox="0 0 32 32"><use xlink:href="#shape_point"></use></svg></li>
+             </ul>
+             <div id="region_info" class="display_none">&nbsp;</div>
+             </div> -->
+
+
         <!-- <button class="leftsidebar_accordion active">Region Shape</button> -->
         <!-- <div class="leftsidebar_accordion_panel show">
              <!-- <ul class="region_shape">
@@ -364,28 +378,28 @@
         </div>
 
         <!-- Attributes -->
-        <button class="leftsidebar_accordion" id="attributes_editor_panel_title">Attributes</button>
-        <div class="leftsidebar_accordion_panel" id="attributes_editor_panel">
-          <div class="button_panel" style="padding:1rem 0;">
-            <span class="text_button" onclick="show_region_attributes_update_panel()" id="button_show_region_attributes" title="Show region attributes">Region Attributes</span>
-            <span class="text_button" onclick="show_file_attributes_update_panel()" id="button_show_file_attributes" title="Show file attributes">File Attributes</span>
-          </div>
-          <div id="attributes_update_panel">
-            <div class="button_panel">
-              <input style="width:70%" type="text" placeholder="attribute name" id="user_input_attribute_id" value="">
-              <span id="button_add_new_attribute" class="button" onclick="add_new_attribute_from_user_input()" title="Add new attribute">&plus;</span>
-              <span id="button_del_attribute" class="button" onclick="delete_existing_attribute_with_confirm()" title="Delete existing attribute">&minus;</span>
-            </div>
-            <div class="button_panel" style="margin:0.1rem 0;" >
-              <select style="width:100%" id="attributes_name_list" onchange="update_current_attribute_id(this)" title="List of existing attributes"></select>
-            </div>
-            <div id="attribute_properties"></div>
-            <div id="attribute_options"></div>
-            <p style="text-align:center">
-              <span class="text_button" title="Show a spreadsheet like editor for all manual annotations" onclick="annotation_editor_toggle_all_regions_editor()">Toggle Annotation Editor</span>
-            </p>
-          </div>
-        </div>
+        <!-- <button class="leftsidebar_accordion" id="attributes_editor_panel_title">Attributes</button>
+             <div class="leftsidebar_accordion_panel" id="attributes_editor_panel">
+             <div class="button_panel" style="padding:1rem 0;">
+             <span class="text_button" onclick="show_region_attributes_update_panel()" id="button_show_region_attributes" title="Show region attributes">Region Attributes</span>
+             <span class="text_button" onclick="show_file_attributes_update_panel()" id="button_show_file_attributes" title="Show file attributes">File Attributes</span>
+             </div>
+             <div id="attributes_update_panel">
+             <div class="button_panel">
+             <input style="width:70%" type="text" placeholder="attribute name" id="user_input_attribute_id" value="">
+             <span id="button_add_new_attribute" class="button" onclick="add_new_attribute_from_user_input()" title="Add new attribute">&plus;</span>
+             <span id="button_del_attribute" class="button" onclick="delete_existing_attribute_with_confirm()" title="Delete existing attribute">&minus;</span>
+             </div>
+             <div class="button_panel" style="margin:0.1rem 0;" >
+             <select style="width:100%" id="attributes_name_list" onchange="update_current_attribute_id(this)" title="List of existing attributes"></select>
+             </div>
+             <div id="attribute_properties"></div>
+             <div id="attribute_options"></div>
+             <p style="text-align:center">
+             <span class="text_button" title="Show a spreadsheet like editor for all manual annotations" onclick="annotation_editor_toggle_all_regions_editor()">Toggle Annotation Editor</span>
+             </p>
+             </div>
+             </div> -->
 
         <button class="leftsidebar_accordion">Keyboard Shortcuts</button>
         <div class="leftsidebar_accordion_panel">
