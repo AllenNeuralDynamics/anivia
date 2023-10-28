@@ -1303,7 +1303,6 @@ async function export_project_to_slp_format(should_add_images) {
   // should return hdf5 file of the project
 
   // NOTE: this function assumes points have name and instance_id attributes associated with them
-  // also assumes that always have n_joints points associated with each instance
 
   var MISSING_CORNER_LENGTH = 50;
 
@@ -1380,24 +1379,26 @@ async function export_project_to_slp_format(should_add_images) {
     // get the points
     // TODO: should be reordered into a dictionary to handle different order of bodyparts
     var regions = metadata.regions;
-    var instance_dict = {};
+    var points_dict = {};
     for(var region_index = 0; region_index < regions.length; region_index++) {
       var region = regions[region_index];
       var instance_id = region.region_attributes['instance_id'];
-      instance_dict[instance_id] = true;
-      // TODO: modify interface to have a separate space for invisible points
-      //       or another way to mark point as missing
+      var name = region.region_attributes['name'];
+      if(!points_dict[instance_id]) {
+        points_dict[instance_id] = {};
+      }
       var invisible = ((region.shape_attributes['cx'] < MISSING_CORNER_LENGTH) &&
                        (region.shape_attributes['cy'] < MISSING_CORNER_LENGTH));
-      points.push( {
+      points_dict[instance_id][name] = {
         x: region.shape_attributes['cx'],
         y: region.shape_attributes['cy'],
         visible: (!invisible) * 1.0
-      });
+      };
     }
 
+
     // frames
-    var num_instances = Object.keys(instance_dict).length;
+    var num_instances = Object.keys(points_dict).length;
     frames.push({
       frame_id: frame_id,
       video: vidnum,
@@ -1406,8 +1407,8 @@ async function export_project_to_slp_format(should_add_images) {
       instance_id_end: instance_num + num_instances
     })
 
-    // instances
-    for ( var _ in Object.keys(instance_dict) ) {
+    // instances and points
+    for ( var instance_id in points_dict ) {
       instances.push({
         instance_id: instance_num,
         frame_id: frame_id,
@@ -1415,6 +1416,15 @@ async function export_project_to_slp_format(should_add_images) {
         point_id_end: (instance_num+1) * n_joints
       });
       instance_num++;
+
+      var subset = points_dict[instance_id];
+      for(var bp_index=0; bp_index<bodyparts.length; bp_index++) {
+        var point = subset[bodyparts[bp_index]];
+        if(!point) {
+          point = {x: 0.0, y: 0.0, visible: 0.0};
+        }
+        points.push(point);
+      }
     }
 
     frame_id += 1;
@@ -9745,7 +9755,7 @@ function recalculate_anivia_instance_nums(img_id) {
   var regions = _via_img_metadata[img_id].regions;
   var instance_dict = {};
   for(var i=0; i<regions.length; i++) {
-    var instance_id = parseInt(regions[i].region_attributes.instance_id);
+    var instance_id = regions[i].region_attributes.instance_id;
     instance_dict[instance_id] = true;
   }
   _anivia_num_instances = Object.keys(instance_dict).length;
