@@ -3197,7 +3197,7 @@ function _via_polygon_del_vertex(region_id, vertex_id) {
 //
 function _via_redraw_reg_canvas() {
   if (_via_current_image_loaded) {
-    if(_via_is_region_selected) {
+    if(_via_is_region_selected && !_via_is_all_region_selected) {
       var region = _via_img_metadata[_via_image_id].regions[_via_user_sel_region_id];
       var instance_id = parseInt(region.region_attributes['instance_id']);
       if(instance_id != NaN) {
@@ -3212,7 +3212,7 @@ function _via_redraw_reg_canvas() {
       if (_via_is_region_boundary_visible) {
         draw_all_regions();
       }
-      if (_via_is_region_id_visible) {
+      if (_via_is_region_id_visible || _via_is_all_region_selected) {
         draw_all_region_id();
       } else if(_via_is_region_selected) { // draw selected region
         draw_region_id(_via_user_sel_region_id);
@@ -4254,7 +4254,8 @@ function _via_handle_global_keydown_event(e) {
       return;
     }
   }
-
+  
+  
   if ( e.key === 'ArrowRight' || e.key === 'n') {
     move_to_next_image();
     e.preventDefault();
@@ -4313,6 +4314,7 @@ function _via_handle_global_keydown_event(e) {
     return;
   }
 
+  
   if ( e.key === 'a' ) {
     if ( _via_display_area_content_name === VIA_DISPLAY_AREA_CONTENT_NAME.IMAGE_GRID ) {
       // select all in image grid
@@ -4448,6 +4450,19 @@ function _via_reg_canvas_keydown_handler(e) {
       return;
     }
 
+    if ( e.key == 'u' ) {
+      delete_instance(_anivia_instance_id);
+      e.preventDefault();
+      return;
+    }
+
+    if ( e.key == 'i' ) {
+      create_instance();
+      e.preventDefault();
+      return;
+    }
+
+    
     if ( _via_is_region_selected ) {
       if ( e.key === 'ArrowRight' ||
            e.key === 'ArrowLeft'  ||
@@ -5181,6 +5196,10 @@ function region_visualisation_update(type, default_id, next_offset) {
   }
 }
 
+//
+// Instance functions
+// 
+
 function select_instance_number(num) {
   _anivia_instance_id = num;
   _via_regions_group_color_init();
@@ -5199,6 +5218,110 @@ function update_instance_selection(add) {
   select_instance_number(new_id);
 }
 
+
+function delete_instance(num) {
+  if (confirm("Are you sure want to delete instance " + num + "?")) {
+    // yes delete
+
+    var del_region_count = 0;
+    var sorted_sel_reg_id = [];
+    for ( var i = 0; i < _via_canvas_regions.length; ++i ) {
+      var region = _via_img_metadata[_via_image_id].regions[i];
+      if(parseInt(region.region_attributes['instance_id']) == num) {
+        sorted_sel_reg_id.push(i);
+        _via_region_selected_flag[i] = false;
+      }
+    }
+    sorted_sel_reg_id.sort( function(a,b) {
+      return (b-a);
+    });
+    for ( var i = 0; i < sorted_sel_reg_id.length; ++i ) {
+      _via_canvas_regions.splice( sorted_sel_reg_id[i], 1);
+      _via_img_metadata[_via_image_id].regions.splice( sorted_sel_reg_id[i], 1);
+      del_region_count += 1;
+    }
+
+    if ( sorted_sel_reg_id.length ) {
+      _via_reg_canvas.style.cursor = "default";
+    }
+
+    _via_is_all_region_selected = false;
+    _via_is_region_selected     = false;
+    _via_user_sel_region_id     = -1;
+
+    recalculate_anivia_instance_nums(_via_image_id);
+    _via_regions_group_color_init();
+    _anivia_instance_id = 0;
+    
+    if ( _via_canvas_regions.length === 0 ) {
+      // all regions were deleted, hence clear region canvas
+      _via_clear_reg_canvas();
+    } else {
+      _via_redraw_reg_canvas();
+    }
+    _via_reg_canvas.focus();
+    annotation_editor_show();
+
+    show_message('Deleted instance ' + num);
+
+  } else {
+    // no cancel
+    return;
+  }
+}
+
+
+function create_instance() {
+  // find the first missing id
+  var regions = _via_img_metadata[_via_image_id].regions;
+  var instance_ids = new Set();
+  for(var i=0; i<regions.length; i++) {
+    var id = parseInt(regions[i].region_attributes['instance_id']);
+    instance_ids.add(id);
+  }
+
+  var new_id;
+  for(var i=0; i<=_anivia_num_instances; i++) {
+    if(!instance_ids.has(i)) {
+      new_id = i;
+      break;
+    }
+  }
+
+  toggle_all_regions_selection(false);
+  
+  // user has marked a landmark point
+  var point_region = new file_region();
+  point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
+  point_region.shape_attributes['cx'] = Math.round(_via_current_x * _via_canvas_scale);
+  point_region.shape_attributes['cy'] = Math.round(_via_current_y * _via_canvas_scale);
+  point_region.region_attributes['name'] = _anivia_bodyparts[0];
+  point_region.region_attributes['instance_id'] = new_id + "";
+  var region_count = _via_img_metadata[_via_image_id].regions.push(point_region);
+  var new_region_id = region_count - 1;
+  set_region_annotations_to_default_value( new_region_id );
+
+  var canvas_point_region = new file_region();
+  canvas_point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
+  canvas_point_region.shape_attributes['cx'] = Math.round(_via_current_x);
+  canvas_point_region.shape_attributes['cy'] = Math.round(_via_current_y);
+  _via_canvas_regions.push(canvas_point_region);
+
+  
+  _anivia_instance_id = new_id;
+  _anivia_num_instances++;
+
+  annotation_editor_update_content();
+
+  _via_regions_group_color_init();
+  _via_redraw_reg_canvas();
+  _via_reg_canvas.focus();
+
+
+  show_message("Created instance " + new_id);  
+}
+
+                   
 //
 // left sidebar toolbox maintainer
 //
