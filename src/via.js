@@ -1880,7 +1880,7 @@ function _via_regions_group_color_init() {
       if( avalue == (_anivia_instance_id + "") ) {
         color = "#f0f0f0";
       } else {
-        color = VIA_REGION_COLOR_LIST[ color_index % VIA_REGION_COLOR_LIST.length ] + "ee";
+        color = VIA_REGION_COLOR_LIST[ color_index % VIA_REGION_COLOR_LIST.length ];
       }
       _via_canvas_regions_group_color[avalue] = color;
 
@@ -2121,6 +2121,7 @@ function _via_reg_canvas_mousedown_handler(e) {
     annotation_editor_clear_row_highlight();
     toggle_all_regions_selection(false);
     set_region_select_state(region_id, true);
+    _via_reg_canvas.style.cursor = "move";
   }
 
   if ( _via_is_region_selected ) {
@@ -2168,6 +2169,9 @@ function _via_reg_canvas_mousedown_handler(e) {
       _via_is_user_drawing_region = true;
     }
   }
+
+  _via_redraw_reg_canvas();
+  _via_reg_canvas.focus();
 }
 
 // implements the following functionalities:
@@ -3193,13 +3197,25 @@ function _via_polygon_del_vertex(region_id, vertex_id) {
 //
 function _via_redraw_reg_canvas() {
   if (_via_current_image_loaded) {
+    if(_via_is_region_selected) {
+      var region = _via_img_metadata[_via_image_id].regions[_via_user_sel_region_id];
+      var instance_id = parseInt(region.region_attributes['instance_id']);
+      if(instance_id != NaN) {
+        _anivia_instance_id = instance_id;
+        _via_regions_group_color_init();
+      }
+    }
+
     _via_reg_ctx.clearRect(0, 0, _via_reg_canvas.width, _via_reg_canvas.height);
+
     if ( _via_canvas_regions.length > 0 ) {
       if (_via_is_region_boundary_visible) {
         draw_all_regions();
       }
       if (_via_is_region_id_visible) {
         draw_all_region_id();
+      } else if(_via_is_region_selected) { // draw selected region
+        draw_region_id(_via_user_sel_region_id);
       }
     }
   }
@@ -3470,7 +3486,7 @@ function _via_draw_point_region(cx, cy, is_selected) {
     _via_draw_point(cx, cy, VIA_REGION_POINT_RADIUS);
 
     _via_reg_ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
+    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
     _via_reg_ctx.stroke();
 
     _via_reg_ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
@@ -3479,13 +3495,13 @@ function _via_draw_point_region(cx, cy, is_selected) {
     _via_reg_ctx.globalAlpha = 1.0;
   } else {
     // draw a fill line
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
+    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH*1.5;
     _via_draw_point(cx, cy, VIA_REGION_POINT_RADIUS);
     _via_reg_ctx.stroke();
 
     // draw a boundary line on both sides of the fill line
     _via_reg_ctx.strokeStyle = VIA_THEME_BOUNDARY_LINE_COLOR;
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/4;
+    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
     _via_draw_point(cx, cy,
                     VIA_REGION_POINT_RADIUS - VIA_THEME_REGION_BOUNDARY_WIDTH/2);
     _via_reg_ctx.stroke();
@@ -3501,26 +3517,27 @@ function _via_draw_point(cx, cy, r) {
   _via_reg_ctx.closePath();
 }
 
-function draw_all_region_id() {
+
+function draw_region_id(i) {
   _via_reg_ctx.shadowColor = "transparent";
   _via_reg_ctx.font = _via_settings.ui.image.region_label_font;
-  for ( var i = 0; i < _via_img_metadata[_via_image_id].regions.length; ++i ) {
-    var canvas_reg = _via_canvas_regions[i];
+  var canvas_reg = _via_canvas_regions[i];
 
-    var bbox = get_region_bounding_box(canvas_reg);
-    var x = bbox[0];
-    var y = bbox[1];
-    var w = Math.abs(bbox[2] - bbox[0]);
 
-    var char_width  = _via_reg_ctx.measureText('M').width;
-    var char_height = 1.8 * char_width;
+  var bbox = get_region_bounding_box(canvas_reg);
+  var x = bbox[0];
+  var y = bbox[1];
+  var w = Math.abs(bbox[2] - bbox[0]);
 
-    var annotation_str  = (i+1).toString();
-    var rattr = _via_img_metadata[_via_image_id].regions[i].region_attributes[_via_settings.ui.image.region_label];
-    var rshape = _via_img_metadata[_via_image_id].regions[i].shape_attributes['name'];
-    if ( _via_settings.ui.image.region_label !== '__via_region_id__' ) {
-      if ( typeof(rattr) !== 'undefined' ) {
-        switch( typeof(rattr) ) {
+  var char_width  = _via_reg_ctx.measureText('M').width;
+  var char_height = 1.8 * char_width;
+
+  var annotation_str  = (i+1).toString();
+  var rattr = _via_img_metadata[_via_image_id].regions[i].region_attributes[_via_settings.ui.image.region_label];
+  var rshape = _via_img_metadata[_via_image_id].regions[i].shape_attributes['name'];
+  if ( _via_settings.ui.image.region_label !== '__via_region_id__' ) {
+    if ( typeof(rattr) !== 'undefined' ) {
+      switch( typeof(rattr) ) {
         default:
         case 'string':
           annotation_str = rattr;
@@ -3528,65 +3545,81 @@ function draw_all_region_id() {
         case 'object':
           annotation_str = Object.keys(rattr).join(',');
           break;
-        }
-      } else {
-        annotation_str = 'undefined';
       }
-    }
-
-    var bgnd_rect_width;
-    var strw = _via_reg_ctx.measureText(annotation_str).width;
-    // if ( strw > w ) {
-    //   if ( _via_settings.ui.image.region_label === '__via_region_id__' ) {
-    //     // region-id is always visible in full
-    //     bgnd_rect_width = strw + char_width;
-    //   } else {
-    //     // if text overflows, crop it
-    //     var str_max     = Math.floor((w * annotation_str.length) / strw);
-    //     if ( str_max > 1 ) {
-    //       annotation_str  = annotation_str.substr(0, str_max-1) + '.';
-    //       bgnd_rect_width = w;
-    //     } else {
-    //       annotation_str  = annotation_str.substr(0, 1) + '.';
-    //       bgnd_rect_width = 2 * char_width;
-    //     }
-    //   }
-    // } else {
-    bgnd_rect_width = strw + char_width;
-    // }
-
-    if (canvas_reg.shape_attributes['name'] === VIA_REGION_SHAPE.POLYGON ||
-        canvas_reg.shape_attributes['name'] === VIA_REGION_SHAPE.POLYLINE) {
-      // put label near the first vertex
-      x = canvas_reg.shape_attributes['all_points_x'][0];
-      y = canvas_reg.shape_attributes['all_points_y'][0];
     } else {
-      // center the label
-      x = x - (bgnd_rect_width/2 - w/2);
+      annotation_str = 'undefined';
     }
+  }
 
-    // ensure that the text is within the image boundaries
-    if ( y < char_height ) {
-      y = char_height;
-    }
+  var bgnd_rect_width;
+  var strw = _via_reg_ctx.measureText(annotation_str).width;
+  // if ( strw > w ) {
+  //   if ( _via_settings.ui.image.region_label === '__via_region_id__' ) {
+  //     // region-id is always visible in full
+  //     bgnd_rect_width = strw + char_width;
+  //   } else {
+  //     // if text overflows, crop it
+  //     var str_max     = Math.floor((w * annotation_str.length) / strw);
+  //     if ( str_max > 1 ) {
+  //       annotation_str  = annotation_str.substr(0, str_max-1) + '.';
+  //       bgnd_rect_width = w;
+  //     } else {
+  //       annotation_str  = annotation_str.substr(0, 1) + '.';
+  //       bgnd_rect_width = 2 * char_width;
+  //     }
+  //   }
+  // } else {
+  bgnd_rect_width = strw + char_width;
+  // }
 
-    // first, draw a background rectangle first
-    _via_reg_ctx.fillStyle = 'black';
-    _via_reg_ctx.globalAlpha = 0.8;
-    _via_reg_ctx.fillRect(Math.floor(x),
-                          Math.floor(y - 1.1*char_height),
-                          Math.floor(bgnd_rect_width),
-                          Math.floor(char_height));
+  if (canvas_reg.shape_attributes['name'] === VIA_REGION_SHAPE.POLYGON ||
+      canvas_reg.shape_attributes['name'] === VIA_REGION_SHAPE.POLYLINE) {
+    // put label near the first vertex
+    x = canvas_reg.shape_attributes['all_points_x'][0];
+    y = canvas_reg.shape_attributes['all_points_y'][0];
+  } else {
+    // center the label
+    x = x - (bgnd_rect_width/2 - w/2);
+  }
 
-    // then, draw text over this background rectangle
-    _via_reg_ctx.globalAlpha = 1.0;
-    _via_reg_ctx.fillStyle = 'yellow';
-    _via_reg_ctx.fillText(annotation_str,
-                          Math.floor(x + 0.4*char_width),
-                          Math.floor(y - 0.35*char_height));
+  // ensure that the text is within the image boundaries
+  if ( y < char_height ) {
+    y = char_height;
+  }
 
+  var instance_id = _via_img_metadata[_via_image_id].regions[i].region_attributes['instance_id'];
+  var alpha = 1.0;
+  if(instance_id != (_anivia_instance_id + "")) {
+    alpha = 0.5;
+  }
+
+  // first, draw a background rectangle first
+  _via_reg_ctx.fillStyle = 'black';
+  _via_reg_ctx.globalAlpha = 0.8 * alpha;
+  _via_reg_ctx.fillRect(Math.floor(x),
+                        Math.floor(y - 1.1*char_height),
+                        Math.floor(bgnd_rect_width),
+                        Math.floor(char_height));
+
+  // then, draw text over this background rectangle
+  _via_reg_ctx.globalAlpha = 1.0 * alpha;
+  _via_reg_ctx.fillStyle = 'yellow';
+  _via_reg_ctx.fillText(annotation_str,
+                        Math.floor(x + 0.4*char_width),
+                        Math.floor(y - 0.35*char_height));
+
+  _via_reg_ctx.globalAlpha = 1.0;
+}
+
+function draw_all_region_id() {
+  _via_reg_ctx.shadowColor = "transparent";
+  _via_reg_ctx.font = _via_settings.ui.image.region_label_font;
+  for ( var i = 0; i < _via_img_metadata[_via_image_id].regions.length; ++i ) {
+    draw_region_id(i);
   }
 }
+
+
 
 function get_region_bounding_box(region) {
   var d = region.shape_attributes;
