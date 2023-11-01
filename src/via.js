@@ -6745,6 +6745,76 @@ function hide_user_input_panel() {
 }
 
 //
+// bodyparts editor panel
+// 
+
+function show_bodyparts_editor_panel() {
+  document.getElementById('bodyparts_editor_panel').style.display = 'block';
+}
+
+function hide_bodyparts_editor_panel() {
+  document.getElementById('bodyparts_editor_panel').style.display = 'none';
+}
+
+
+var bodypart_list = document.getElementById("bodypart_list");
+
+function create_bodyparts_editor_panel() {
+  bodypart_list.innerHTML = '';
+  for(var i=0; i<_anivia_bodyparts.length; i++) {
+    add_bodypart(_anivia_bodyparts[i]);
+  }
+  show_bodyparts_editor_panel();
+}
+
+function remove_bodypart(event) {
+  var item = event.target.parentNode;
+  bodypart_list.removeChild(item);
+}
+
+function add_bodypart(item_name) {
+  if(!item_name) {
+    var item_name = prompt("Enter the name for the new item:");
+  }
+  if (item_name) {
+    var item = document.createElement("li");
+    item.innerHTML = '<span>' + item_name + '</span>' +
+      '<button onclick="remove_bodypart(event)" class="remove-btn">Remove</button>';
+    bodypart_list.appendChild(item);
+  }
+}
+
+function bodyparts_save_edit() {
+  var lis = bodypart_list.getElementsByTagName('li');
+  var bodyparts = [];
+  
+  for (var i = 0; i < lis.length; i++) {
+    var span = lis[i].getElementsByTagName('span')[0];
+    var item = span.textContent;
+    bodyparts.push(item)
+  }
+  console.log(bodyparts);
+  _anivia_bodyparts = bodyparts;
+  hide_bodyparts_editor_panel()
+}
+  
+function bodyparts_cancel_edit() {
+  hide_bodyparts_editor_panel();
+}
+
+// Reorder functionality
+Sortable.create(bodypart_list, {
+  animation: 150,
+  onStart: function(event) {
+    event.item.style.cursor = "move";
+  },
+  onEnd: function(event) {
+    event.item.style.cursor = "default";
+  }
+});
+
+  
+//
 // annotations editor panel
 //
 function annotation_editor_show() {

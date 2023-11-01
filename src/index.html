@@ -53,6 +53,8 @@
     </script>
 
     <link rel="stylesheet" type="text/css" href="via.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.13.0/Sortable.min.js"></script>
   </head>
 
   <body onload="_via_init()" onresize="_via_update_ui_components()">
@@ -179,6 +181,32 @@
     <!-- used by invoke_with_user_inputs() to gather user inputs -->
     <div id="user_input_panel"></div>
 
+    <!-- editor for adding/removing/reordering bodyparts -->
+    <div id="bodyparts_editor_panel">
+      <div class="content">
+        <p class="title">Bodyparts editor</p>
+        <ul id="bodypart_list">
+        </ul>
+        <div class="add_bodypart">
+          <button id="bodyparts_add_part"
+                  onclick="add_bodypart()">
+            Add bodypart
+          </button>
+        </div>
+        <br/>
+        <div class="bodyparts_confirm">
+          <button id="bodyparts_save_button"
+                  onclick="bodyparts_save_edit()">
+            Save
+          </button>
+          <button id="bodyparts_cancel_button"
+                  onclick="bodyparts_cancel_edit()">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- to show status messages -->
     <div id="message_panel">
       <div id="message_panel_content" class="content"></div>
@@ -209,6 +237,7 @@
               <li onclick="project_open_select_project_file()" title="Load a VIA project (from a JSON file)">Load</li>
               <li onclick="project_save_with_confirm()" title="Save this VIA project (as a JSON file)">Save</li>
               <li onclick="settings_panel_toggle()" title="Show/edit project settings">Settings</li>
+              <li onclick="create_bodyparts_editor_panel()" title="Edit bodyparts">Edit bodyparts</li>
               <li class="submenu_divider"></li>
               <li onclick="sel_local_images()" title="Add images locally stored in this computer">Add local files</li>
               <li onclick="sel_local_slp()" title="Load SLP file">Load SLP file</li>
