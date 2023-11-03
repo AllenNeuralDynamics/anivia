@@ -282,6 +282,7 @@ _via_settings.core.default_filepath = '';
 
 // UI html elements
 var invisible_file_input = document.getElementById("invisible_file_input");
+var invisible_folder_input = document.getElementById("invisible_folder_input");
 var display_area    = document.getElementById("display_area");
 var ui_top_panel    = document.getElementById("ui_top_panel");
 var image_panel     = document.getElementById("image_panel");
@@ -555,6 +556,16 @@ function sel_local_slp() {
   }
 }
 
+
+function sel_local_lightning_pose() {
+  if (invisible_folder_input) {
+    invisible_folder_input.type = "file";
+    invisible_folder_input.webkitdirectory = true;
+    invisible_folder_input.onchange = project_file_add_lightning_pose;
+    invisible_folder_input.click();
+  }
+}
+
 // invoked by menu-item buttons in HTML UI
 function download_all_region_data(type, file_extension) {
   if ( typeof(file_extension) === 'undefined' ) {
@@ -657,6 +668,136 @@ function import_annotations_from_file(event) {
 
 function load_coco_annotations_json_file(event) {
   load_text_file(event.target.files[0], import_coco_annotations_from_json);
+}
+
+
+function import_annotations_from_lightning_pose_csv(data) {
+  return new Promise( function(ok_callback, err_callback) {
+    if ( data === '' || typeof(data) === 'undefined') {
+      err_callback();
+    }
+
+    window.data = data;
+    
+    var region_import_count = 0;
+    var malformed_csv_lines_count = 0;
+    var file_added_count = 0;
+
+    var line_split_regex = new RegExp('\n|\r|\r\n', 'g');
+    var csvdata = data.split(line_split_regex);
+
+    // parse the header
+    var scorer_row = parse_csv_line(csvdata[0])
+    var bodypart_row = parse_csv_line(csvdata[1]);
+    var coords_row = parse_csv_line(csvdata[2]);
+    
+    if ( (scorer_row[0] != 'scorer' ||
+           bodypart_row[0] != 'bodyparts' ||
+           coords_row[0] != 'coords')  ||
+         (scorer_row.length != bodypart_row.length ||
+          bodypart_row.length != coords_row.length)) {
+      show_message('Invalid header in CSV file');
+      err_callback();
+      return;
+    }
+
+    var bodyparts = Array.from(new Set(bodypart_row.slice(1)));
+    _anivia_bodyparts = bodyparts;
+    
+    var n = csvdata.length;
+    var i;
+    var first_img_id = '';
+    for ( i = 3; i < n; ++i ) {
+      // ignore blank lines
+      if (csvdata[i].charAt(0) === '\n' || csvdata[i].charAt(0) === '') {
+        continue;
+      }
+
+      var d = parse_csv_line(csvdata[i]);
+
+      // check if csv line was malformed
+      if ( d.length !== scorer_row.length ) {
+        malformed_csv_lines_count += 1;
+        continue;
+      }
+
+      var filename = d[0];
+      var img_id   = _via_get_image_id(filename, -1);
+
+      // check if file is already present in this project
+      if ( ! _via_img_metadata.hasOwnProperty(img_id) ) {
+        img_id = project_add_new_file(filename);
+        if ( _via_settings.core.default_filepath === '' ) {
+          _via_img_src[img_id] = filename;
+        } else {
+          _via_file_resolve_file_to_default_filepath(img_id);
+        }
+        file_added_count += 1;
+
+        if ( first_img_id === '' ) {
+          first_img_id = img_id;
+        }
+      }
+
+      // add points for this file
+
+      /// store into a dictionary
+      var points_row = {};
+      for (var col = 1; col < d.length; ++col) {
+        var bp = bodypart_row[col];
+        var coord = coords_row[col];
+        if(!points_row[bp]) {
+          points_row[bp] = {}
+        }
+        points_row[bp][coord] = parseFloat(d[col]);
+      }
+
+      for(var bp of bodyparts) {
+        console.log(filename + " " + bp + " " + points_row[bp]['x'] + " " + points_row[bp]['y']);
+        var x = parseFloat(points_row[bp]['x']);
+        var y = parseFloat(points_row[bp]['y']);
+
+        var region_i = new file_region();
+        // coordinates
+        if(isNaN(x) || isNaN(y)) {
+          // TODO: better handling of missing points
+          region_i.shape_attributes = {cx: 10, cy: 10, name: "point"}; 
+        } else {
+          region_i.shape_attributes = {cx: x, cy: y, name: "point"};
+        }
+        // name -- instance_id is always 0 since lightning pose is single animal
+        region_i.region_attributes = {"name": bp, "instance_id": "0"};
+
+        // add to image
+        _via_img_metadata[img_id].regions.push(region_i);
+        region_import_count += 1;
+      }
+
+    }
+    show_message('Import Summary : [' + file_added_count + '] new files, ' +
+                 '[' + region_import_count + '] regions, ' +
+                 '[' + malformed_csv_lines_count  + '] malformed csv lines.');
+
+    if ( file_added_count ) {
+      update_img_fn_list();
+    }
+
+    if ( _via_current_image_loaded ) {
+      if ( region_import_count ) {
+        update_attributes_update_panel();
+        annotation_editor_update_content();
+        _via_load_canvas_regions(); // image to canvas space transform
+        _via_redraw_reg_canvas();
+        _via_reg_canvas.focus();
+      }
+    } else {
+      if ( file_added_count ) {
+        var first_img_index = _via_image_id_list.indexOf(first_img_id);
+        _via_show_img( first_img_index );
+      }
+    }
+    ok_callback([file_added_count, region_import_count, malformed_csv_lines_count]);
+  });
 }
 
 function import_annotations_from_csv(data) {
@@ -8252,6 +8393,89 @@ async function project_file_add_slp(event) {
   }
   
   h5file.close();
+}
+
+
+function project_file_add_lightning_pose(event) {
+  var files = Array.from(event.target.files);
+  files.sort(function(a, b) {
+    return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
+  });
+  // add the images
+
+  var new_img_index_list = [];
+  var discarded_file_count = 0;
+  for ( var i = 0; i < files.length; ++i ) {
+    var filetype = files[i].type.substr(0, 5);
+    console.log(files[i].type);
+    if ( filetype === 'image' ) {
+      // check which filename in project matches the user selected file
+      var img_index = _via_image_filename_list.indexOf(files[i].name);
+       if( img_index === -1) {
+        // a new file was added to project
+        var path = files[i].webkitRelativePath;
+        var pathList = path.split("/");
+        var folder = pathList[pathList.length - 2];
+        var name = pathList[pathList.length - 1];
+        var fullpath = "";
+        if(folder) {
+          fullpath = folder + "/";
+        }
+        fullpath = fullpath + name;
+
+        var new_img_id = project_add_new_file(fullpath);
+        _via_img_fileref[new_img_id] = files[i];
+        set_file_annotations_to_default_value(new_img_id);
+        new_img_index_list.push( _via_image_id_list.indexOf(new_img_id) );
+      } else {
+        // an existing file was resolved using browser's file selector
+        var img_id = _via_image_id_list[img_index];
+        _via_img_fileref[img_id] = files[i];
+        _via_img_metadata[img_id]['size'] = files[i].size;
+      }
+    } else {
+      discarded_file_count += 1;
+    }
+  }
+
+  // add the annotations
+
+  //  find the csv file
+  var csv_file;
+  for ( var i = 0; i < files.length; ++i ) {
+    if( (files[i].type == 'text/csv') &&
+        (files[i].webkitRelativePath.split("/").length == 2) ) {
+      // top level csv
+      csv_file = files[i];
+      break;
+    }
+  }
+  if(csv_file) {
+    load_text_file(csv_file, import_annotations_from_lightning_pose_csv);
+  } else {
+    console.log("missing lightning pose csv annotation file!");
+  }
+  // show the images
+  if ( _via_img_metadata ) {
+    var status_msg = 'Loaded ' + new_img_index_list.length + ' images.';
+    if ( discarded_file_count ) {
+      status_msg += ' ( Discarded ' + discarded_file_count + ' non-image files! )';
+    }
+    show_message(status_msg);
+
+    if ( new_img_index_list.length ) {
+      // show first of newly added image
+      _via_show_img( new_img_index_list[0] );
+    } else {
+      // show original image
+      _via_show_img ( _via_image_index );
+    }
+    update_img_fn_list();
+  } else {
+    show_message("Please upload some image files!");
+  }
+  
+
 }
 
 function project_file_add_local(event) {
