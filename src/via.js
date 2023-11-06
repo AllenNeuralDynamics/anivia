@@ -1425,6 +1425,12 @@ function pack_via_metadata(return_type) {
       });
     }
 
+    else if( return_type == 'lp' ) {
+      export_project_to_lightning_pose().then(function(data) {
+          ok_callback([data]);
+      });
+    }
+
     // see http://cocodataset.org/#format-data
     else if( return_type === 'coco' ) {
       img_stat_set_all().then( function(ok) {
@@ -1438,6 +1444,84 @@ function pack_via_metadata(return_type) {
       ok_callback( [ JSON.stringify(_via_img_metadata) ] );
     }
   }.bind(this));
+}
+
+async function export_project_to_lightning_pose() {
+
+  var MISSING_CORNER_LENGTH = 50;
+
+  var bodyparts = _anivia_bodyparts;
+  var scorer = "scorer"; // maybe worth specifying?
+
+  var csvdata = [];
+
+  // build the header
+  var scorer_row = ["scorer"];
+  var bodypart_row = ["bodyparts"];
+  var coords_row = ["coords"];
+
+  for(var i=0; i < _anivia_bodyparts.length; ++i) {
+    for (var coord of "xy") {
+      scorer_row.push(scorer);
+      bodypart_row.push(_anivia_bodyparts[i]);
+      coords_row.push(coord);
+    }
+  }
+
+  csvdata.push(scorer_row.join(VIA_CSV_SEP));
+  csvdata.push("\n" + bodypart_row.join(VIA_CSV_SEP));
+  csvdata.push("\n" + coords_row.join(VIA_CSV_SEP));
+
+  
+  for( var img_id of _via_image_id_list ) {
+    var metadata = _via_img_metadata[img_id]
+    console.log(metadata);
+    var filename = metadata.filename;
+    
+    var regions = metadata.regions;
+    var points_dict = {};
+    for(var region_index = 0; region_index < regions.length; region_index++) {
+      var region = regions[region_index];
+      var instance_id = region.region_attributes['instance_id'];
+      var name = region.region_attributes['name'];
+      if(!points_dict[instance_id]) {
+        points_dict[instance_id] = {};
+      }
+      var invisible = ((region.shape_attributes['cx'] < MISSING_CORNER_LENGTH) &&
+                       (region.shape_attributes['cy'] < MISSING_CORNER_LENGTH));
+      points_dict[instance_id][name] = {
+        x: region.shape_attributes['cx'],
+        y: region.shape_attributes['cy'],
+        visible: (!invisible)
+      };
+    }
+
+    var csvline = [filename];
+    
+    // only one instance possible, by default instance "0"
+    var instance_id = "0";
+    if(!points_dict[instance_id]) {
+      instance_id = Object.keys(points_dict)[0];
+    }
+
+    for(var bp of _anivia_bodyparts) {
+      for (var coord of "xy") {
+        var val;
+        if(points_dict[instance_id] &&
+           points_dict[instance_id][bp] &&
+           points_dict[instance_id][bp]['visible']) {
+          val = points_dict[instance_id][bp][coord];
+        } else {
+          val = "";
+        }
+        csvline.push(val);
+      }
+    }
+
+    csvdata.push("\n" + csvline.join(VIA_CSV_SEP));
+  }
+    
+  return csvdata;
 }
 
 async function export_project_to_slp_format(should_add_images) {
@@ -1485,8 +1569,7 @@ async function export_project_to_slp_format(should_add_images) {
   var instance_num = 0;
   var frame_id = 0;
 
-  for( var img_index in _via_image_id_list ) {
-    var img_id = _via_image_id_list[img_index];
+  for( var img_id of _via_image_id_list ) {
     var metadata = _via_img_metadata[img_id]
     var filename = metadata.filename;
     var fsplit = filename.split("/");
@@ -1518,7 +1601,6 @@ async function export_project_to_slp_format(should_add_images) {
     }
 
     // get the points
-    // TODO: should be reordered into a dictionary to handle different order of bodyparts
     var regions = metadata.regions;
     var points_dict = {};
     for(var region_index = 0; region_index < regions.length; region_index++) {
@@ -1549,7 +1631,7 @@ async function export_project_to_slp_format(should_add_images) {
     })
 
     // instances and points
-    for ( var instance_id in points_dict ) {
+    for ( var instance_id of Object.keys(points_dict) ) {
       instances.push({
         instance_id: instance_num,
         frame_id: frame_id,
@@ -2655,6 +2737,9 @@ function _via_reg_canvas_mouseup_handler(e) {
               } else {
                 point_name = bodypart_set.values().next().value;
               }
+            } else {
+              show_message("Define the bodyparts before placing points!")
+              break;
             }
 
             // user has marked a landmark point
