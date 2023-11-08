@@ -320,6 +320,8 @@ var _anivia_bodyparts = []; // list of bodyparts within each animal
 var _anivia_instance_id = 0; // current instance id
 var _anivia_num_instances = 0; // number of instances, updated by image
 
+var ANIVIA_H5_CONVERTER_SERVER = "http://localhost:5000";
+
 //
 // Data structure to store metadata about file and regions
 //
@@ -566,6 +568,15 @@ function sel_local_lightning_pose() {
   }
 }
 
+function sel_local_deeplabcut() {
+  if (invisible_folder_input) {
+    invisible_folder_input.type = "file";
+    invisible_folder_input.webkitdirectory = true;
+    invisible_folder_input.onchange = project_file_add_deeplabcut;
+    invisible_folder_input.click();
+  }
+}
+
 // invoked by menu-item buttons in HTML UI
 function download_all_region_data(type, file_extension) {
   if ( typeof(file_extension) === 'undefined' ) {
@@ -671,7 +682,11 @@ function load_coco_annotations_json_file(event) {
 }
 
 
-function import_annotations_from_lightning_pose_csv(data) {
+function import_annotations_from_deeplabcut_csv(data) {
+  import_annotations_from_lightning_pose_csv(data, true);
+}
+
+function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
   return new Promise( function(ok_callback, err_callback) {
     if ( data === '' || typeof(data) === 'undefined') {
       err_callback();
@@ -722,6 +737,9 @@ function import_annotations_from_lightning_pose_csv(data) {
       }
 
       var filename = d[0];
+      if(trim_labeled_data) {
+        filename = filename.replace("labeled-data/", "");
+      }
       var img_id   = _via_get_image_id(filename, -1);
 
       // check if file is already present in this project
@@ -753,7 +771,6 @@ function import_annotations_from_lightning_pose_csv(data) {
       }
 
       for(var bp of bodyparts) {
-        console.log(filename + " " + bp + " " + points_row[bp]['x'] + " " + points_row[bp]['y']);
         var x = parseFloat(points_row[bp]['x']);
         var y = parseFloat(points_row[bp]['y']);
 
@@ -784,7 +801,7 @@ function import_annotations_from_lightning_pose_csv(data) {
 
     if ( _via_current_image_loaded ) {
       if ( region_import_count ) {
-        update_attributes_update_panel();
+        // update_attributes_update_panel();
         annotation_editor_update_content();
         _via_load_canvas_regions(); // image to canvas space transform
         _via_redraw_reg_canvas();
@@ -8481,13 +8498,106 @@ async function project_file_add_slp(event) {
 }
 
 
+function project_file_add_deeplabcut(event) {
+  var files = Array.from(event.target.files);
+  files.sort(function(a, b) {
+    return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
+  });
+  
+  // add the images
+  var new_img_index_list = [];
+  var discarded_file_count = 0;
+  for ( var i = 0; i < files.length; ++i ) {
+    var filetype = files[i].type.substr(0, 5);
+    console.log(files[i].type);
+    if ( filetype === 'image' ) {
+      // check which filename in project matches the user selected file
+      var img_index = _via_image_filename_list.indexOf(files[i].name);
+       if( img_index === -1) {
+        // a new file was added to project
+        var path = files[i].webkitRelativePath;
+        var pathList = path.split("/");
+        var folder = pathList[pathList.length - 2];
+        var name = pathList[pathList.length - 1];
+        var fullpath = "";
+        if(folder) {
+          fullpath = folder + "/";
+        }
+        fullpath = fullpath + name;
+
+        var new_img_id = project_add_new_file(fullpath);
+        _via_img_fileref[new_img_id] = files[i];
+        set_file_annotations_to_default_value(new_img_id);
+        new_img_index_list.push( _via_image_id_list.indexOf(new_img_id) );
+      } else {
+        // an existing file was resolved using browser's file selector
+        var img_id = _via_image_id_list[img_index];
+        _via_img_fileref[img_id] = files[i];
+        _via_img_metadata[img_id]['size'] = files[i].size;
+      }
+    } else {
+      discarded_file_count += 1;
+    }
+  }
+
+  // add the annotations
+
+  //  find the h5 file
+  var h5_file;
+  for ( var i = 0; i < files.length; ++i ) {
+    var path = files[i].webkitRelativePath;
+    if(path.slice(path.length-3) == ".h5") {
+      h5_file = files[i];
+      break;
+    }
+  }
+  
+  if(h5_file) {
+    var formData = new FormData();
+    formData.append('file', h5_file);
+
+    fetch(ANIVIA_H5_CONVERTER_SERVER + '/h5_to_csv', {
+      method: 'POST',
+      body: formData
+    }).then(response => response.text())
+      .then(csvData => {
+      import_annotations_from_lightning_pose_csv(csvData, true);
+    })
+  } else {
+    console.log("missing deeplabcut h5 annotation file!");
+  }
+  
+  // show the images
+  if ( _via_img_metadata ) {
+    var status_msg = 'Loaded ' + new_img_index_list.length + ' images.';
+    if ( discarded_file_count ) {
+      status_msg += ' ( Discarded ' + discarded_file_count + ' non-image files! )';
+    }
+    show_message(status_msg);
+
+    if ( new_img_index_list.length ) {
+      // show first of newly added image
+      _via_show_img( new_img_index_list[0] );
+    } else {
+      // show original image
+      _via_show_img ( _via_image_index );
+    }
+    update_img_fn_list();
+  } else {
+    show_message("Please upload some image files!");
+  }
+  
+
+}
+
+
 function project_file_add_lightning_pose(event) {
   var files = Array.from(event.target.files);
   files.sort(function(a, b) {
     return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
   });
+  
   // add the images
-
   var new_img_index_list = [];
   var discarded_file_count = 0;
   for ( var i = 0; i < files.length; ++i ) {
@@ -8559,8 +8669,6 @@ function project_file_add_lightning_pose(event) {
   } else {
     show_message("Please upload some image files!");
   }
-  
-
 }
 
 function project_file_add_local(event) {
