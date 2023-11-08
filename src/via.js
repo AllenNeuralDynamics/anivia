@@ -585,7 +585,7 @@ function download_all_region_data(type, file_extension) {
   // Javascript strings (DOMString) is automatically converted to utf-8
   // see: https://developer.mozilla.org/en-US/docs/Web/API/Blob/Blob
   pack_via_metadata(type).then( function(data) {
-    if(type == "slp" || type == "img_slp") { // slp files are hdf5
+    if(type == "slp" || type == "img_slp" || type == "deeplabcut") { // slp & dlc files are hdf5
       var blob_attr = {type: 'application/x-hdf5'};
     } else { // everything else is text
       var blob_attr = {type: 'text/'+file_extension+';charset=utf-8'};
@@ -1448,6 +1448,22 @@ function pack_via_metadata(return_type) {
       });
     }
 
+    else if( return_type == 'deeplabcut' ) {
+      export_project_to_lightning_pose(true).then(function(data) {
+        var file = new File([data], "data.csv");
+        var formData = new FormData();
+        formData.append('file', file);
+
+        fetch(ANIVIA_H5_CONVERTER_SERVER + '/csv_to_h5', {
+             method: 'POST',
+             body: formData
+        }).then(response => response.blob())
+          .then(binaryData => {
+            ok_callback([binaryData]);
+        });
+      });
+    }
+    
     // see http://cocodataset.org/#format-data
     else if( return_type === 'coco' ) {
       img_stat_set_all().then( function(ok) {
@@ -1463,7 +1479,7 @@ function pack_via_metadata(return_type) {
   }.bind(this));
 }
 
-async function export_project_to_lightning_pose() {
+async function export_project_to_lightning_pose(add_labeled_data) {
 
   var MISSING_CORNER_LENGTH = 50;
 
@@ -1486,14 +1502,17 @@ async function export_project_to_lightning_pose() {
   }
 
   csvdata.push(scorer_row.join(VIA_CSV_SEP));
-  csvdata.push("\n" + bodypart_row.join(VIA_CSV_SEP));
-  csvdata.push("\n" + coords_row.join(VIA_CSV_SEP));
+  csvdata.push(bodypart_row.join(VIA_CSV_SEP));
+  csvdata.push(coords_row.join(VIA_CSV_SEP));
 
   
   for( var img_id of _via_image_id_list ) {
     var metadata = _via_img_metadata[img_id]
     console.log(metadata);
     var filename = metadata.filename;
+    if(add_labeled_data) {
+      filename = "labeled-data/" + filename;
+    }
     
     var regions = metadata.regions;
     var points_dict = {};
@@ -1535,10 +1554,10 @@ async function export_project_to_lightning_pose() {
       }
     }
 
-    csvdata.push("\n" + csvline.join(VIA_CSV_SEP));
+    csvdata.push(csvline.join(VIA_CSV_SEP));
   }
-    
-  return csvdata;
+
+  return [csvdata.join("\n")];
 }
 
 async function export_project_to_slp_format(should_add_images) {
