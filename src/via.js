@@ -320,7 +320,7 @@ var _anivia_bodyparts = []; // list of bodyparts within each animal
 var _anivia_instance_id = 0; // current instance id
 var _anivia_num_instances = 0; // number of instances, updated by image
 
-var ANIVIA_H5_CONVERTER_SERVER = "http://localhost:5000";
+var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
 
 //
 // Data structure to store metadata about file and regions
