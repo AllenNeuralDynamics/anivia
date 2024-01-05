@@ -29,7 +29,7 @@
         ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
         POSSIBILITY OF SUCH DAMAGE.
       -->
-    <title>VGG Image Annotator</title>
+    <title>Anivia</title>
     <meta name="author" content="Abhishek Dutta">
     <meta name="description" content="VIA is a standalone image annotator application packaged as a single HTML file (< 400 KB) that runs on most modern web browsers.">
 
@@ -234,42 +234,48 @@
           <li onclick="show_home_panel()" style="cursor:pointer;">Home</li>
           <li>Project
             <ul>
-              <li onclick="project_open_select_project_file()" title="Load a VIA project (from a JSON file)">Load</li>
-              <li onclick="project_save_with_confirm()" title="Save this VIA project (as a JSON file)">Save</li>
+              <!-- <li onclick="project_open_select_project_file()" title="Load a VIA project (from a JSON file)">Load</li> -->
+              <!-- <li onclick="project_save_with_confirm()" title="Save this VIA project (as a JSON file)">Save</li> -->
               <li onclick="settings_panel_toggle()" title="Show/edit project settings">Settings</li>
               <li onclick="create_bodyparts_editor_panel()" title="Edit bodyparts">Edit bodyparts</li>
-              <li class="submenu_divider"></li>
-              <li onclick="sel_local_slp()" title="Load SLP file">Load SLP file</li>
-              <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>
-              <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
-              <li class="submenu_divider"></li>
-              <li onclick="sel_local_images()" title="Add images locally stored in this computer">Add local files</li>
-              <li onclick="project_file_add_url_with_input()" title="Add images from a web URL (e.g. http://www.robots.ox.ac.uk/~vgg/software/via/images/swan.jpg)">Add files from URL</li>
-              <li onclick="project_file_add_abs_path_with_input()" title="Add images using absolute path of file (e.g. /home/abhishek/image1.jpg)">Add file using absolute path</li>
-              <li onclick="sel_local_data_file('files_url')" title="Add images from a list of web url or absolute path stored in a text file (one url or path per line)">Add url or path from text file</li>
+              <li onclick="download_as_image()" title="Download an image containing the annotations">Download current image</li>
               <li onclick="project_file_remove_with_confirm()" title="Remove selected file (i.e. file currently being shown)">Remove file</li>
               <!-- <li onclick="sel_local_data_file('attributes')" title="Import region and file attributes from a JSON file">Import region/file attributes</li> -->
               <!-- <li onclick="project_save_attributes()" title="Export region and file attributes to a JSON file">Export region/file attributes</li> -->
             </ul>
           </li>
 
-          <li>Annotation
+          <li>Import
             <ul>
-              <li onclick="download_all_region_data('csv')" title="Export annotations to a CSV file">Export Annotations (as csv)</li>
-              <li onclick="download_all_region_data('json')" title="Export annotations to a JSON file">Export Annotations (as json)</li>
-              <li onclick="download_all_region_data('coco', 'json')" title="Export annotations to COCO (http://cocodataset.org) format">Export Annotations (COCO format)</li>
+              <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
+              <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>
+              <li onclick="sel_local_slp()" title="Load SLP file">Load SLEAP dataset (SLP file)</li>
+              <li class="submenu_divider"></li>
+              <li onclick="sel_local_data_file('annotations')" title="Import annotations from a CSV file">Import annotations (from csv)</li>
+              <li onclick="sel_local_data_file('annotations')" title="Import annotations from a JSON file">Import annotations (from json)</li>
+              <li onclick="sel_local_data_file('annotations_coco')" title="Import annotations from a COCO (http://cocodataset.org) formatted JSON file">Import Annotations (COCO format)</li>
+              <li class="submenu_divider"></li>
+              <li onclick="sel_local_images()" title="Add images locally stored in this computer">Add local files</li>
+              <li onclick="project_file_add_url_with_input()" title="Add images from a web URL (e.g. http://www.robots.ox.ac.uk/~vgg/software/via/images/swan.jpg)">Add files from URL</li>
+              <li onclick="project_file_add_abs_path_with_input()" title="Add images using absolute path of file (e.g. /home/abhishek/image1.jpg)">Add file using absolute path</li>
+              <li onclick="sel_local_data_file('files_url')" title="Add images from a list of web url or absolute path stored in a text file (one url or path per line)">Add url or path from text file</li>
+            </ul>
+          </li>
+
+          <li>Export
+            <ul>
               <li onclick="download_all_region_data('deeplabcut', 'h5')" title="Export annotations to DeepLabCut format">Export Annotations (DeepLabCut format)</li>
               <li onclick="download_all_region_data('lp', 'csv')" title="Export annotations to Lightning Pose format">Export Annotations (Lightning Pose format)</li>
               <li onclick="download_all_region_data('slp', 'pkg.slp')" title="Export annotations to SLP format">Export Annotations (SLP format)</li>
               <li onclick="download_all_region_data('img_slp', 'pkg.slp')" title="Export annotations to SLP format (with images)">Export Annotations (SLP format with images)</li>
               <li onclick="" class="submenu_divider"></li>
-              <li onclick="sel_local_data_file('annotations')" title="Import annotations from a CSV file">Import Annotations (from csv)</li>
-              <li onclick="sel_local_data_file('annotations')" title="Import annotations from a JSON file">Import Annotations (from json)</li>
-              <li onclick="sel_local_data_file('annotations_coco')" title="Import annotations from a COCO (http://cocodataset.org) formatted JSON file">Import Annotations (COCO format)</li>
+              <li onclick="download_all_region_data('csv')" title="Export annotations to a CSV file">Export Annotations (as csv)</li>
+              <li onclick="download_all_region_data('json')" title="Export annotations to a JSON file">Export Annotations (as json)</li>
+              <li onclick="download_all_region_data('coco', 'json')" title="Export annotations to COCO (http://cocodataset.org) format">Export Annotations (COCO format)</li>
+              <!-- <li onclick="" class="submenu_divider"></li> -->
+              <!-- <li class="submenu_divider"></li>
+                   <li onclick="show_annotation_data()" title="Show a preview of annotations (opens in a new browser windows)">Preview Annotations</li> -->
 
-              <li class="submenu_divider"></li>
-              <li onclick="show_annotation_data()" title="Show a preview of annotations (opens in a new browser windows)">Preview Annotations</li>
-              <li onclick="download_as_image()" title="Download an image containing the annotations">Download as Image</li>
             </ul>
           </li>
 
@@ -279,25 +285,25 @@
               <li onclick="leftsidebar_toggle()" title="Show or hide the sidebar shown in left hand side">Toggle left sidebar</li>
               <li onclick="toggle_img_fn_list_visibility()" title="Show or hide a panel to update annotations corresponding to file and region">Toggle image filename list</li>
               <li onclick="toggle_message_visibility()" title="Show or hide status messages that appears at the bottom of the page">Toggle status message visibility</li>
-              <li class="submenu_divider"></li>
-              <li onclick="toggle_attributes_editor()" title="Show or hide a panel to update file and region attributes">Toggle attributes editor</li>
-              <li onclick="annotation_editor_toggle_all_regions_editor()" title="Show or hide a panel to update annotations corresponding to file and region">Toggle annotation editor (Space)</li>
+              <!-- <li class="submenu_divider"></li> -->
+              <!-- <li onclick="toggle_attributes_editor()" title="Show or hide a panel to update file and region attributes">Toggle attributes editor</li> -->
+              <!-- <li onclick="annotation_editor_toggle_all_regions_editor()" title="Show or hide a panel to update annotations corresponding to file and region">Toggle annotation editor (Space)</li> -->
               <li class="submenu_divider"></li>
               <li onclick="toggle_region_boundary_visibility()" title="Show or hide the region boundaries">Show/hide region boundaries (b)</li>
               <li onclick="toggle_region_id_visibility()" title="Show or hide the region id labels">Show/hide region labels (l)</li>
-              <li onclick="toggle_region_info_visibility()" title="Show or hide the image coordinates">Show/hide region info.</li>
+              <!-- <li onclick="toggle_region_info_visibility()" title="Show or hide the image coordinates">Show/hide region info.</li> -->
             </ul>
           </li>
 
           <li>Help
             <ul>
               <li onclick="set_display_area_content(VIA_DISPLAY_AREA_CONTENT_NAME.PAGE_GETTING_STARTED)" title="Show a guide to get started with this application">Getting Started</li>
-              <li title="Visit the project page for this application"><a href="http://www.robots.ox.ac.uk/~vgg/software/via/" target="_blank">VGG Project Page</a></li>
-              <li onclick="" title="Report an issue to the developers of this application (requires an account at gitlab.com)"><a href="https://gitlab.com/vgg/via/issues" target="_blank">Report issues</a></li>
+              <!-- <li title="Visit the project page for this application"><a href="http://www.robots.ox.ac.uk/~vgg/software/via/" target="_blank">VGG VIA Project Page</a></li> -->
+              <li onclick="" title="Report an issue to the developers of this application"><a href="https://github.com/lambdaloop/anivia/issues" target="_blank">Report issues</a></li>
               <li class="submenu_divider"></li>
-              <li><a target="_blank" href="https://gitlab.com/vgg/via/blob/master/Contributors.md" title="List of people who have contributed towards the development of VIA">Contributors</a></li>
+              <li><a target="_blank" href="https://github.com/lambdaloop/anivia/graphs/contributors" title="List of people who have contributed towards the development of VIA">Contributors</a></li>
               <li onclick="set_display_area_content(VIA_DISPLAY_AREA_CONTENT_NAME.PAGE_LICENSE)" title="View license of this application">License</li>
-              <li onclick="set_display_area_content(VIA_DISPLAY_AREA_CONTENT_NAME.PAGE_ABOUT)" title="Show more details about this application">About VIA</li>
+              <li onclick="set_display_area_content(VIA_DISPLAY_AREA_CONTENT_NAME.PAGE_ABOUT)" title="Show more details about this application">About Anivia</li>
             </ul>
           </li>
         </ul>
@@ -305,18 +311,18 @@
 
       <!-- Shortcut toolbar -->
       <div class="toolbar">
-        <svg onclick="project_open_select_project_file()" viewbox="0 0 24 24"><use xlink:href="#icon_open"></use><title>Open Project</title></svg>
-        <svg onclick="project_save_with_confirm()" viewbox="0 0 24 24"><use xlink:href="#icon_save"></use><title>Save Project</title></svg>
-        <svg onclick="settings_panel_toggle()" viewbox="0 0 24 24"><use xlink:href="#icon_settings"></use><title>Update Project Settings</title></svg>
+        <!-- <svg onclick="project_open_select_project_file()" viewbox="0 0 24 24"><use xlink:href="#icon_open"></use><title>Open Project</title></svg>
+             <svg onclick="project_save_with_confirm()" viewbox="0 0 24 24"><use xlink:href="#icon_save"></use><title>Save Project</title></svg>
+             <svg onclick="settings_panel_toggle()" viewbox="0 0 24 24"><use xlink:href="#icon_settings"></use><title>Update Project Settings</title></svg> -->
         <!--
         <svg onclick="" viewbox="0 0 24 24"><use xlink:href="#icon_checkbox"></use><title>Locate Files</title></svg>
         -->
 
-        <svg onclick="sel_local_data_file('annotations')" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_fileupload"></use><title>Import Annotations from CSV</title></svg>
-        <svg onclick="download_all_region_data('csv')" viewbox="0 0 24 24"><use xlink:href="#icon_filedownload"></use><title>Download Annotations as CSV</title></svg>
+        <!-- <svg onclick="sel_local_data_file('annotations')" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_fileupload"></use><title>Import Annotations from CSV</title></svg> -->
+        <!-- <svg onclick="download_all_region_data('csv')" viewbox="0 0 24 24"><use xlink:href="#icon_filedownload"></use><title>Download Annotations as CSV</title></svg> -->
 
         <svg onclick="image_grid_toggle()" id="toolbar_image_grid_toggle" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_gridon"></use><title>Switch to Image Grid View</title></svg>
-        <svg onclick="annotation_editor_toggle_all_regions_editor()" viewbox="0 0 24 24"><use xlink:href="#icon_insertcomment"></use><title>Toggle Annotation Editor</title></svg>
+        <!-- <svg onclick="annotation_editor_toggle_all_regions_editor()" viewbox="0 0 24 24"><use xlink:href="#icon_insertcomment"></use><title>Toggle Annotation Editor</title></svg> -->
 
         <svg onclick="move_to_prev_image()" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_prev"></use><title>Previous</title></svg>
         <svg onclick="toggle_img_fn_list_visibility()" viewbox="0 0 24 24"><use xlink:href="#icon_list"></use><title>Toggle Filename List</title></svg>
@@ -588,49 +594,49 @@
             </div>
           </div>
 
-          <div class="row">
-            <div class="variable">
-              <div class="name">Default Path</div>
-              <div class="desc">If all images in your project are saved in a single folder, set the default path to the location of this folder. The VIA application will load images from this folder by default. Note: a default path of <code>"./"</code> indicates that the folder containing <code>via.html</code> application file also contains the images in this project. For example: <code>/datasets/VOC2012/JPEGImages/</code> or <code>C:\Documents\data\</code>&nbsp;<strong>(note the trailing <code>/</code> and <code>\</code></strong>)</div>
-            </div>
+          <!-- <div class="row">
+               <div class="variable">
+               <div class="name">Default Path</div>
+               <div class="desc">If all images in your project are saved in a single folder, set the default path to the location of this folder. The VIA application will load images from this folder by default. Note: a default path of <code>"./"</code> indicates that the folder containing <code>via.html</code> application file also contains the images in this project. For example: <code>/datasets/VOC2012/JPEGImages/</code> or <code>C:\Documents\data\</code>&nbsp;<strong>(note the trailing <code>/</code> and <code>\</code></strong>)</div>
+               </div>
 
-            <div class="value">
-              <input type="text" id="_via_settings.core.default_filepath" placeholder="/datasets/pascal/voc2012/VOCdevkit/VOC2012/JPEGImages/"/>
-            </div>
-          </div>
+               <div class="value">
+               <input type="text" id="_via_settings.core.default_filepath" placeholder="/datasets/pascal/voc2012/VOCdevkit/VOC2012/JPEGImages/"/>
+               </div>
+               </div> -->
 
-          <div class="row">
-            <div class="variable">
-              <div class="name">Search Path List</div>
-              <div class="desc">If you define multiple paths, all these folders will be searched to find images in this project. We do not recommend this approach as it is computationally expensive to search for images in multiple folders. <ol id="_via_settings.core.filepath"></ol></div>
-            </div>
+          <!-- <div class="row">
+               <div class="variable">
+               <div class="name">Search Path List</div>
+               <div class="desc">If you define multiple paths, all these folders will be searched to find images in this project. We do not recommend this approach as it is computationally expensive to search for images in multiple folders. <ol id="_via_settings.core.filepath"></ol></div>
+               </div>
 
-            <div class="value">
-              <input type="text" id="settings_input_new_filepath" placeholder="/datasets/pascal/voc2012/VOCdevkit/VOC2012/JPEGImages"/>
-            </div>
-          </div>
+               <div class="value">
+               <input type="text" id="settings_input_new_filepath" placeholder="/datasets/pascal/voc2012/VOCdevkit/VOC2012/JPEGImages"/>
+               </div>
+               </div> -->
 
-          <div class="row">
-            <div class="variable">
-              <div class="name">Region Label</div>
-              <div class="desc">By default, each region in an image is labelled using the region-id. Here, you can select a more descriptive labelling of regions.</div>
-            </div>
+          <!-- <div class="row">
+               <div class="variable">
+               <div class="name">Region Label</div>
+               <div class="desc">By default, each region in an image is labelled using the region-id. Here, you can select a more descriptive labelling of regions.</div>
+               </div>
 
-            <div class="value">
-              <select id="_via_settings.ui.image.region_label"></select>
-            </div>
-          </div>
+               <div class="value">
+               <select id="_via_settings.ui.image.region_label"></select>
+               </div>
+               </div>
 
-          <div class="row">
-            <div class="variable">
-              <div class="name">Region Colour</div>
-              <div class="desc">By default, each region is drawn using a single colour. Using this setting, you can assign a unique colour to regions grouped according to a region attribute.</div>
-            </div>
+               <div class="row">
+               <div class="variable">
+               <div class="name">Region Colour</div>
+               <div class="desc">By default, each region is drawn using a single colour. Using this setting, you can assign a unique colour to regions grouped according to a region attribute.</div>
+               </div>
 
-            <div class="value">
-              <select id="_via_settings.ui.image.region_color"></select>
-            </div>
-          </div>
+               <div class="value">
+               <select id="_via_settings.ui.image.region_color"></select>
+               </div>
+               </div> -->
 
           <div class="row">
             <div class="variable">
@@ -653,20 +659,20 @@
             </div>
           </div>
 
-          <div class="row">
-            <div class="variable">
-              <div class="name">On-image Annotation Editor</div>
-              <div class="desc">When a single region is selected, the on-image annotation editor is gets activated which the user to update annotations of this region. By default, this on-image annotation editor is placed near the selected region.</div>
-            </div>
+          <!-- <div class="row">
+               <div class="variable">
+               <div class="name">On-image Annotation Editor</div>
+               <div class="desc">When a single region is selected, the on-image annotation editor is gets activated which the user to update annotations of this region. By default, this on-image annotation editor is placed near the selected region.</div>
+               </div>
 
-            <div class="value">
-              <select id="_via_settings.ui.image.on_image_annotation_editor_placement">
-                <option value="NEAR_REGION">close to selected region</option>
-                <option value="IMAGE_BOTTOM">at the bottom of image being annotated</option>
-                <option value="DISABLE">DISABLE on-image annotation editor</option>
-              </select>
-            </div>
-          </div>
+               <div class="value">
+               <select id="_via_settings.ui.image.on_image_annotation_editor_placement">
+               <option value="NEAR_REGION">close to selected region</option>
+               <option value="IMAGE_BOTTOM">at the bottom of image being annotated</option>
+               <option value="DISABLE">DISABLE on-image annotation editor</option>
+               </select>
+               </div>
+               </div> -->
 
           <div class="row" style="border:none;">
             <button onclick="settings_save()" value="save_settings" style="margin-top:2rem">Save</button>

@@ -10827,8 +10827,8 @@ function settings_panel_toggle() {
 }
 
 function settings_init() {
-  settings_region_visualisation_update_options();
-  settings_filepath_update_html();
+  // settings_region_visualisation_update_options();
+  // settings_filepath_update_html();
   settings_show_current_value();
 }
 
