@@ -334,12 +334,12 @@
         <!-- <svg onclick="sel_local_data_file('annotations')" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_fileupload"></use><title>Import Annotations from CSV</title></svg> -->
         <!-- <svg onclick="download_all_region_data('csv')" viewbox="0 0 24 24"><use xlink:href="#icon_filedownload"></use><title>Download Annotations as CSV</title></svg> -->
 
-        <svg onclick="image_grid_toggle()" id="toolbar_image_grid_toggle" viewbox="0 0 24 24"><use xlink:href="#icon_gridon"></use><title>Switch to Image Grid View</title></svg>
         <!-- <svg onclick="annotation_editor_toggle_all_regions_editor()" viewbox="0 0 24 24"><use xlink:href="#icon_insertcomment"></use><title>Toggle Annotation Editor</title></svg> -->
 
-        <svg onclick="move_to_prev_image()" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_prev"></use><title>Previous</title></svg>
-        <svg onclick="toggle_img_fn_list_visibility()" viewbox="0 0 24 24"><use xlink:href="#icon_list"></use><title>Toggle Filename List</title></svg>
+        <svg onclick="move_to_prev_image()"  viewbox="0 0 24 24"><use xlink:href="#icon_prev"></use><title>Previous</title></svg>
+        <!-- <svg onclick="toggle_img_fn_list_visibility()" viewbox="0 0 24 24"><use xlink:href="#icon_list"></use><title>Toggle Filename List</title></svg> -->
         <svg onclick="move_to_next_image()" viewbox="0 0 24 24"><use xlink:href="#icon_next"></use><title>Next</title></svg>
+        <svg onclick="image_grid_toggle()" id="toolbar_image_grid_toggle" viewbox="0 0 24 24"><use xlink:href="#icon_gridon"></use><title>Switch to Image Grid View</title></svg>
 
         <svg onclick="zoom_in()" style="margin-left:1rem;" viewbox="0 0 24 24"><use xlink:href="#icon_zoomin"></use><title>Zoom In</title></svg>
         <svg onclick="zoom_out()" viewbox="0 0 24 24"><use xlink:href="#icon_zoomout"></use><title>Zoom Out</title></svg>
@@ -719,69 +719,93 @@
         </div>
 
         <div id="page_getting_started" class="display_area_content display_none narrow_page_content">
-          <p>A more detailed user guide (with screenshots and descriptions) is <a href="http://www.robots.ox.ac.uk/~vgg/software/via/docs/user_guide.html">available here</a>.</p>
-          <ol>
-            <li><strong>Load Images</strong>: The first step is to load all the images that you wish to annotate. There are multiple ways to add images to a VIA project. Choose the method that suits your use case.
-              <ul>
-                <li>Method 1: Selecting local files using browser's file selector
-                  <ol>
-                    <li>Click <span class="text_button" title="Load or Add Images" onclick="sel_local_images()"><code>Project &rarr; Add local files</code></span></li>
-                    <li>Select desired images and click <code>Open</code></li>
-                  </ol>
-                </li>
-                <li>Method 2: Adding files from URL or absolute path
-                  <ol>
-                    <li>Click <span class="text_button" title="Add images from a web URL (e.g. http://www.robots.ox.ac.uk/~vgg/software/via/images/swan.jpg)" onclick="project_file_add_url_with_input()"><code>Project &rarr; Add files from URL</code></span></li>
-                    <li>Enter URL and click <code>OK</code></li>
-                  </ol>
-                </li>
-                <li>Method 3: Adding files from list of url or absolute path stored in text file
-                  <ol>
-                    <li>Create a text file containing URL and absolute path (one per line)</li>
-                    <li>Click <span class="text_button" title="Add images from a list of web url or absolute path stored in a text file (one url or path per line)" onclick="sel_local_data_file('files_url')"><code>Project &rarr; Add url or path from text file</code></span></li>
-                    <li>Select the text file and click <code>Open</code></li>
-                  </ol>
-                </li>
-              </ul>
-            </li>
-            <li><strong>Draw Regions</strong>: Select a region shape (<span class="text_button" onclick="select_region_shape('rect')">rectangle</span>, <span class="text_button" onclick="select_region_shape('circle')">circle</span>, <span class="text_button" onclick="select_region_shape('ellipse')">ellipse</span>, <span class="text_button" onclick="select_region_shape('polygon')">polygon</span>, <span class="text_button" onclick="select_region_shape('point')">point</span>, <span class="text_button" onclick="select_region_shape('polyline')">polyline</span>) from the left sidebar and draw regions as follows:
+          <section id="importing-annotations" class="level1">
+            <h1>Importing annotations</h1>
+            <section id="from-deeplabcut" class="level2">
+              <h3 class="anchored" data-anchor-id="from-deeplabcut">from DeepLabCut</h3>
+              <p>To import a DeepLabCut dataset, follow the steps below. Note that you can only label one folder at a time.</p>
+              <ol type="1">
+                <li>In the menu, click on: Import &gt; Load DeepLabCut dataset</li>
+                <li>Navigate to your DeepLabCut project</li>
+                <li>Go within the labeled-data</li>
+                <li>Select a folder and click “Upload”</li>
+              </ol>
+              <p>If there are no labels yet, you may need to specify bodyparts (below). Note: Due to limitations on h5 libraries in javascript, just the h5 (not images) is sent to server to convert it to a csv to parse.</p>
+            </section>
+            <section id="from-lightning-pose" class="level2">
+              <h3 class="anchored" data-anchor-id="from-lightning-pose">from Lightning Pose</h3>
+              <p>To import a Lightning Pose dataset, follow the steps below.</p>
+              <ol type="1">
+                <li>In the menu, click on: Import &gt; Load Lightning Pose dataset</li>
+                <li>Navigate to your folder which contains “CollectedData.csv”</li>
+                <li>Select that folder and click “Upload”</li>
+              </ol>
+            </section>
+            <section id="from-sleap" class="level2">
+              <h3 class="anchored" data-anchor-id="from-sleap">from SLEAP</h3>
+              <p>To import a SLEAP dataset, follow these steps:</p>
+              <ol type="1">
+                <li>In the menu, click on: Import &gt; Load SLEAP dataset (SLP file)</li>
+                <li>Select your slp file and select “Upload”</li>
+              </ol>
+              <p>Note that SLP file must have the images padded with zeros to account for the javascript h5 loading library. This is already in the latest SLEAP code and will be available in future SLEAP releases. For now, you can use <a href="https://gist.github.com/lambdaloop/cf80b92b4a1218919c71486916eaff90">this python script</a> to pad your video items.</p>
+            </section>
+          </section>
+          <section id="specifying-bodyparts" class="level1">
+            <h1>Specifying bodyparts</h1>
+            <p>To add or edit the bodyparts for labeling, follow the steps below.</p>
+            <ol type="1">
+              <li>In the menu, click on: Project &gt; Edit bodyparts</li>
+              <li>You will enter the Bodyparts editor, where you can add or remove bodyparts</li>
+              <li>You can drag bodyparts around to change the order for labeling</li>
+            </ol>
+            <p>If you have some annotations within your files already, the bodyparts will automatically be populated.</p>
+          </section>
+          <section id="labeling-images" class="level1">
+            <h1>Labeling images</h1>
+            <section id="annotating-images" class="level2">
+              <h3 class="anchored" data-anchor-id="annotating-images">annotating images</h3>
+              <p>Place keypoints by clicking in the image. The keypoints will be placed following the order of bodyparts. (See above for how to edit the bodyparts.)</p>
+              <p>You can move a keypoint by clicking it and dragging it. You can delete a keypoint by selecting it and either pressing “d” or clicking the X icon in the toolbar.</p>
+              <p>To navigate across images, you can use the left/right arrow keys, clicking in the file menu, or click the left/right arrows in the toolbar.</p>
+            </section>
+            <section id="labeling-multiple-animals" class="level2">
+              <h3 class="anchored" data-anchor-id="labeling-multiple-animals">labeling multiple animals</h3>
+              <p>Anivia supports labeling multiple animals, but only if you export to a SLEAP file currently.</p>
+              <p>The interface focuses on one animal “instance” at a time. By default when you click to place points it places them in instance 0.</p>
+              <p>Here is how you navigate the instance interface: - “i” for new instance (or circle plus in toolbar) - “u” to delete an instance (or circle minus in toolbar) - up and down arrows to switch between instances (or circle up and down in toolbar, or just click on a point from that instance)</p>
+            </section>
+          </section>
+          <section id="exporting-annotations" class="level1">
+            <h1>Exporting annotations</h1>
+            <section id="to-deeplabcut" class="level2">
+              <h3 class="anchored" data-anchor-id="to-deeplabcut">to DeepLabCut</h3>
+              <p>To export your annotations to DeepLabCut, follow these steps:</p>
+              <ol type="1">
+                <li>In the menu, click on: Export &gt; Export Annotations (DeepLabCut format)</li>
+                <li>Save your file as “CollectedData_SCORER.h5” within the folder within labeled-data that you imported Replace SCORER above with the actual scorer name you specified at the top of your DeepLabCut config.yaml</li>
+              </ol>
+              <p>Note: Similarly to importing, due to limitations on h5 libraries in javascript, the labels are sent to server to convert them to generate an h5 file. Again, no images are ever sent out of your machine.</p>
+            </section>
+            <section id="to-lightning-pose" class="level2">
+              <h3 class="anchored" data-anchor-id="to-lightning-pose">to Lightning Pose</h3>
+              <p>To export your annotations to Lightning Pose, follow these steps:</p>
+              <ol type="1">
+                <li>In the menu, click on: Export &gt; Export Annotations (Lightning Pose format)</li>
+                <li>Save your file as “CollectedData.csv” within the folder you imported</li>
+              </ol>
+            </section>
+            <section id="to-sleap" class="level2">
+              <h3 class="anchored" data-anchor-id="to-sleap">to SLEAP</h3>
+              <p>To export your annotations to Lightning Pose, follow these steps:</p>
+              <ol type="1">
+                <li>In the menu, click on: Export &gt; Export Annotations (SLP format)</li>
+                <li>Save your slp file wherever.</li>
+              </ol>
+              <p>It might take a bit of time (less than a minute) to generate the SLP file for export.</p>
+            </section>
+          </section>
 
-              <ul>
-                <li>Rectangle, Circle and Ellipse
-                  <ul>
-                    <li>Press left mouse button, drag mouse cursor and release mouse button.</li>
-                    <li>To define a point inside an existing region, click inside the region to select it (if not already selected), now press left mouse button, drag and release to draw region inside existing region.</li>
-                    <li>To select, click inside the region. If the click point contains multiple regions, then clicking multiple times at that location shuffles selection through those regions.</li>
-                  </ul>
-                </li>
-              </ul>
-
-              <ul>
-                <li>Point
-                  <ul>
-                    <li>Click to define points.</li>
-                    <li>To draw a region inside existing region, click inside the region to select it (if not already selected), now click again to define the point.</li>
-                    <li>To select, click on (or near) the existing point.</li>
-                  </ul>
-                </li>
-              </ul>
-
-              <ul>
-                <li>Polygon and Polyline
-                  <ul>
-                    <li>Click to define vertices.</li>
-                    <li>Press <strong>[Enter]</strong> to finish drawing the region or press [Esc] to cancel.</li>
-                    <li>If the first vertex needs to be defined inside an existing region, click inside the region to select it (if not already selected), now click again to define the vertex.</li>
-                    <li>To select, click inside the region. If the click point contains multiple regions, then clicking multiple times at that location shuffles selection through those regions.</li>
-                  </ul>
-                </li>
-              </ul>
-            </li>
-
-            <li><strong>Create Annotations</strong>: For a more detailed description of this step, see <a href="http://www.robots.ox.ac.uk/~vgg/software/via/docs/creating_annotations.html">Creating Annotations : VIA User Guide</a>. Click the <span class="text_button" onclick="annotation_editor_toggle_all_regions_editor()"><code>View &rarr; Toggle attributes editor</code></span> to show attributes editor panel in left sidebar and add the desired file or region attributes (e.g. name). Now click <span class="text_button" onclick="annotation_editor_toggle_all_regions_editor()"><code>View &rarr; Toggle annotations editor</code></span> to show the annotation editor panel in the bottom side. Update the annotations for each region.</li>
-            <li><strong>Export Annotations</strong>: To export the annotations in json or csv format, click <span class="text_button" onclick="download_all_region_data('csv')"><code>Annotation &rarr; Export annotations</code></span> in top menubar.</li>
-            <li><strong>Save Project</strong>: To save the project, click <span class="text_button" onclick="project_save_with_confirm()"><code>Project &rarr; Save</code></span> in top menubar.</li>
-          </ol>
         </div>
 
         <div id="page_load_ongoing" class="display_area_content narrow_page_content">
@@ -796,32 +820,26 @@
         </div>
 
         <div id="page_about" class="display_area_content display_none" style="width:40rem !important">
-          <div style="text-align:center">
-            <a href="http://www.robots.ox.ac.uk/~vgg/software/via/">
-              <svg height="160" viewbox="0 0 400 160" style="background-color:#212121;">
-                <use xlink:href="#via_logo"></use>
-              </svg>
-            </a>
-          </div>
+          <!-- <div style="text-align:center">
+               <a href="http://www.robots.ox.ac.uk/~vgg/software/via/">
+               <svg height="160" viewbox="0 0 400 160" style="background-color:#212121;">
+               <use xlink:href="#via_logo"></use>
+               </svg>
+               </a>
+               </div> -->
 
-          <p style="font-family:mono; font-size:0.8em;text-align:center;"><a href="https://gitlab.com/vgg/via/blob/master/CHANGELOG">Version 2.0.12</a></p>
-          <p>VGG Image Annotator (VIA) is an image annotation tool that can be used to define regions in an image and create textual descriptions of those regions. VIA is an <a href="https://gitlab.com/vgg/via/">open source project</a> developed at the <a href="http://www.robots.ox.ac.uk/~vgg/">Visual Geometry Group</a> and released under the BSD-2 clause <a href="https://gitlab.com/vgg/via/blob/master/LICENSE">license</a>.</p>
-          <p>Here is a list of some salient features of VIA:
-            <ul>
-              <li>based solely on HTML, CSS and Javascript (no external javascript libraries)</li>
-              <li>can be used off-line (full application in a single html file of size &lt; 400KB)</li>
-              <li>requires nothing more than a modern web browser (tested on Firefox, Chrome and Safari)</li>
-              <li>supported region shapes: rectangle, circle, ellipse, polygon, point and polyline</li>
-              <li>import/export of region data in csv and json file format</li>
-            </ul>
-          </p>
-          <p>For more details, visit <a href="http://www.robots.ox.ac.uk/~vgg/software/via/">http://www.robots.ox.ac.uk/~vgg/software/via/</a>.</p>
+          <p style="font-family:mono; font-size:0.8em;text-align:center;">Version 2.0.12-anivia1</p>
+          <p>Anivia is a tool to support annotation of animal bodyparts in a web interface. The images are loaded in your browser locally.</p>
+          <p>It is a streamlined version of <a href="https://www.robots.ox.ac.uk/~vgg/software/via/">VGG VIA</a>, intended specifically for animal annotation.</p>
+
           <p>&nbsp;</p>
-          <p>Copyright &copy; 2016-2021, <a href="mailto:adutta-removeme@robots.ox.ac.uk">Abhishek Dutta</a>,Visual Geometry Group, Oxford University and <a target="_blank" href="https://gitlab.com/vgg/via/blob/master/Contributors.md">VIA Contributors</a>.</p>
+          <p>(Anivia changes) Copyright &copy; 2023-2024, Lili Karashchuk, Allen Instite for Neural Dynamics, and <a target="_blank" href="https://github.com/lambdaloop/anivia/graphs/contributors">Anivia Contributors</a>.</p>
+          <p>(VGG VIA) Copyright &copy; 2016-2021, <a href="mailto:adutta-removeme@robots.ox.ac.uk">Abhishek Dutta</a>,Visual Geometry Group, Oxford University and <a target="_blank" href="https://gitlab.com/vgg/via/blob/master/Contributors.md">VIA Contributors</a>.</p>
         </div> <!-- end of page_about -->
 
         <div id="page_license" class="display_area_content display_none narrow_page_content">
           <pre>
+Copyright (c) 2023-2024, Lili Karashchuk, Allen Institute for Neural Dynamics, and Anivia Contributors.
 Copyright (c) 2016-2022, Abhishek Dutta, Visual Geometry Group, Oxford University and VIA Contributors.
 All rights reserved.
 
