@@ -577,6 +577,7 @@ function sel_local_deeplabcut() {
   }
 }
 
+
 // invoked by menu-item buttons in HTML UI
 function download_all_region_data(type, file_extension) {
   if ( typeof(file_extension) === 'undefined' ) {
@@ -7064,6 +7065,49 @@ function bodyparts_cancel_edit() {
   hide_bodyparts_editor_panel();
 }
 
+function bodyparts_import() {
+  if (invisible_file_input) {
+    invisible_file_input.setAttribute('single', 'single');
+    invisible_file_input.accept   = '.yaml,.toml';
+    invisible_file_input.onchange = bodyparts_actually_import;
+    invisible_file_input.click();
+  }  
+}
+
+
+function bodyparts_actually_import(event) {
+  var file = event.target.files[0];
+  console.log(file.webkitRelativePath);
+  // load_text_file(csv_file, function);
+  window.test = file;
+  var ext = file.name.substr(file.name.length - 5);
+  if(ext == ".toml") {
+    // import toml file, read bodyparts attribute
+    load_text_file(file, function(text) {
+      let json = window.toml.parse(text);
+      console.log(json['bodyparts']);
+      _anivia_bodyparts = json['bodyparts'];
+      create_bodyparts_editor_panel();
+    })
+  } else if(ext == ".yaml") {
+    // import yaml file, read bodyparts attribute
+    load_text_file(file, function(text) {
+      let json = YAML.parse(text);
+      console.log(json['bodyparts']);
+      _anivia_bodyparts = json['bodyparts'];
+      create_bodyparts_editor_panel();
+    })
+  }
+}
+
+function bodyparts_export() {
+  // write a yaml file with bodyparts
+  // save the csv
+  // similar to the code following:
+  //   download_all_region_data('lp', 'csv')
+}
+
+                   
 // Reorder functionality
 Sortable.create(bodypart_list, {
   animation: 150,
@@ -8382,7 +8426,7 @@ function project_add_new_file(filename, size, file_id) {
 let h5wasm;
 (async () => {
   let module = await import(
-    "https://cdn.jsdelivr.net/npm/h5wasm@latest/dist/esm/hdf5_hl.js");
+    "https://cdn.jsdelivr.net/npm/h5wasm@0.7.2/dist/esm/hdf5_hl.js");
   h5wasm = module.h5wasm;
   h5wasm.FS = (await h5wasm.ready).FS;
 })();

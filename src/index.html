@@ -55,6 +55,8 @@
     <link rel="stylesheet" type="text/css" href="via.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.13.0/Sortable.min.js"></script>
+    <script src="lib/toml.js"></script>
+    <script src="lib/yaml.js"></script>
   </head>
 
   <body onload="_via_init()" onresize="_via_update_ui_components()">
@@ -208,6 +210,16 @@
         </div>
         <br/>
         <div class="bodyparts_confirm">
+          <button id="bodyparts_export_button"
+                  onclick="bodyparts_export()">
+            Export
+          </button>
+
+          <button id="bodyparts_import_button"
+                  onclick="bodyparts_import()">
+            Import
+          </button>
+
           <button id="bodyparts_save_button"
                   onclick="bodyparts_save_edit()">
             Save
