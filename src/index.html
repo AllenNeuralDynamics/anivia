@@ -277,6 +277,7 @@
               <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
               <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>
               <li onclick="sel_local_slp()" title="Load SLP file">Load SLEAP dataset (SLP file)</li>
+              <li onclick="sel_local_anipose()" title="Load Anipose dataset">Load Anipose dataset</li>
               <li class="submenu_divider"></li>
               <li onclick="sel_local_data_file('annotations')" title="Import annotations from a CSV file">Import annotations (from csv)</li>
               <li onclick="sel_local_data_file('annotations')" title="Import annotations from a JSON file">Import annotations (from json)</li>
@@ -441,13 +442,13 @@
             </div>
           </div>
           <div id="img_fn_list"></div>
-          <p>
-            <div class="button_panel">
-              <span class="button" onclick="sel_local_images()" title="Add new file from local disk">Add Files</span>
-              <span class="button" onclick="project_file_add_url_with_input()" title="Add new file using URL">Add URL</span>
-              <span class="button" onclick="project_file_remove_with_confirm()" title="Remove selected file (i.e. file currently being shown) from project">Remove</span>
-            </div>
-          </p>
+          <!-- <p>
+               <div class="button_panel">
+               <span class="button" onclick="sel_local_images()" title="Add new file from local disk">Add Files</span>
+               <span class="button" onclick="project_file_add_url_with_input()" title="Add new file using URL">Add URL</span>
+               <span class="button" onclick="project_file_remove_with_confirm()" title="Remove selected file (i.e. file currently being shown) from project">Remove</span>
+               </div>
+               </p> -->
         </div>
 
         <!-- Attributes -->

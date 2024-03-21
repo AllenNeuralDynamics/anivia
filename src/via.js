@@ -577,6 +577,15 @@ function sel_local_deeplabcut() {
   }
 }
 
+function sel_local_anipose() {
+  if (invisible_folder_input) {
+    invisible_folder_input.type = "file";
+    invisible_folder_input.webkitdirectory = true;
+    invisible_folder_input.onchange = project_file_add_anipose;
+    invisible_folder_input.click();
+  }
+}
+
 
 // invoked by menu-item buttons in HTML UI
 function download_all_region_data(type, file_extension) {
@@ -8665,6 +8674,126 @@ function project_file_add_deeplabcut(event) {
 }
 
 
+function project_file_add_anipose(event) {
+  var files = Array.from(event.target.files);
+  files.sort(function(a, b) {
+    return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
+  });
+
+  window.files = files;
+
+  // add the images
+  var new_img_index_list = [];
+  var discarded_file_count = 0;
+  for ( var i = 0; i < files.length; ++i ) {
+    var filetype = files[i].type.substr(0, 5);
+    console.log(files[i].type);
+    if ( filetype === 'image' ) {
+      // check which filename in project matches the user selected file
+      var img_index = _via_image_filename_list.indexOf(files[i].name);
+       if( img_index === -1) {
+        // a new file was added to project
+        var path = files[i].webkitRelativePath;
+        var pathList = path.split("/");
+        var folder = pathList[pathList.length - 2];
+        var name = pathList[pathList.length - 1];
+        var fullpath = "";
+        if(folder) {
+          fullpath = folder + "/";
+        }
+        fullpath = fullpath + name;
+
+        var new_img_id = project_add_new_file(fullpath);
+        _via_img_fileref[new_img_id] = files[i];
+        set_file_annotations_to_default_value(new_img_id);
+        new_img_index_list.push( _via_image_id_list.indexOf(new_img_id) );
+      } else {
+        // an existing file was resolved using browser's file selector
+        var img_id = _via_image_id_list[img_index];
+        _via_img_fileref[img_id] = files[i];
+        _via_img_metadata[img_id]['size'] = files[i].size;
+      }
+    } else {
+      discarded_file_count += 1;
+    }
+  }
+
+  // show the images
+  if ( _via_img_metadata ) {
+    var status_msg = 'Loaded ' + new_img_index_list.length + ' images.';
+    if ( discarded_file_count ) {
+      status_msg += ' ( Discarded ' + discarded_file_count + ' non-image files! )';
+    }
+    show_message(status_msg);
+
+    if ( new_img_index_list.length ) {
+      // show first of newly added image
+      _via_show_img( new_img_index_list[0] );
+    } else {
+      // show original image
+      _via_show_img ( _via_image_index );
+    }
+    update_img_fn_list();
+  } else {
+    show_message("Please upload some image files!");
+  }
+
+
+  var calib_file;
+  var config_file;
+  for ( var i = 0; i < files.length; ++i ) {
+    var depth = files[i].webkitRelativePath.split("/").length;
+    if(depth == 2) {
+      if(files[i].name == "calibration.toml") {
+        calib_file = files[i];
+      } else if(files[i].name == "config.toml") {
+        config_file = files[i];
+      }
+    }
+  }
+
+  // load the images
+  
+
+  // promises to load both calib and config files 
+  Promise.all([
+    new Promise((resolve, reject) => {
+      load_text_file(calib_file, (text) => {
+        const calibration = TOML.parse(text);
+        resolve(calibration);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      load_text_file(config_file, (text) => {
+        const config = TOML.parse(text);
+        resolve(config);
+      });
+    })
+  ]).then(([calibration, config]) => {
+    // Both calibration and config are loaded now, you can use them here
+    console.log('Calibration:', calibration);
+    console.log('Config:', config);
+
+    // load the regex, cropping parameters, and calibration
+    // into our internal format
+  }).catch((error) => {
+    console.error('Error loading files:', error);
+  });
+
+  // var calibration;
+  // load_text_file(calib_file, function(text) {
+  //   calibration = TOML.parse(text);
+  //   window.calibration = calibration;
+  // });
+
+  // var config;
+  // load_text_file(calib_file, function(text) {
+  //   config = TOML.parse(text);
+  //   window.config = config;
+  // });
+
+}
+
 function project_file_add_lightning_pose(event) {
   var files = Array.from(event.target.files);
   files.sort(function(a, b) {
@@ -10451,14 +10580,14 @@ function _via_show_img(img_index) {
   } else {
     // image not in buffer, so first add this image to buffer
     _via_is_loading_current_image = true;
-    img_loading_spinbar(img_index, true);
+    // img_loading_spinbar(img_index, true);
     _via_img_buffer_add_image(img_index).then( function(ok_img_index) {
       _via_is_loading_current_image = false;
-      img_loading_spinbar(img_index, false);
+      // img_loading_spinbar(img_index, false);
       _via_show_img(img_index);
     }, function(err_img_index) {
       _via_is_loading_current_image = false;
-      img_loading_spinbar(img_index, false);
+      // img_loading_spinbar(img_index, false);
       show_page_404(img_index);
       console.log('_via_img_buffer_add_image() failed for file: ' + _via_image_filename_list[err_img_index]);
     });
@@ -10489,7 +10618,10 @@ function _via_buffer_hide_current_image() {
 
 function _via_show_img_from_buffer(img_index) {
   return new Promise( function(ok_callback, err_callback) {
-    _via_buffer_hide_current_image();
+    // _via_buffer_hide_current_image();
+    img_fn_list_ith_entry_selected(_via_image_index, false);
+    _via_clear_reg_canvas(); // clear old region shapes
+    var old_image = _via_current_image;
 
     var cimg_html_id = _via_img_buffer_get_html_id(img_index);
     _via_current_image = document.getElementById(cimg_html_id);
@@ -10500,7 +10632,11 @@ function _via_show_img_from_buffer(img_index) {
       return;
     }
     _via_current_image.classList.add('visible'); // now show the new image
-
+    if ( old_image ) { // set up like this to avoid annoying flash
+      setTimeout(function() {
+        old_image.classList.remove('visible');
+      }, 20);
+    }
     _via_image_index = img_index;
     _via_image_id    = _via_image_id_list[_via_image_index];
     _via_current_image_filename = _via_img_metadata[_via_image_id].filename;
