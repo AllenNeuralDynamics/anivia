@@ -200,24 +200,22 @@
     <div id="bodyparts_editor_panel">
       <div class="content">
         <p class="title">Bodyparts editor</p>
-        <ul id="bodypart_list">
-        </ul>
-        <div class="add_bodypart">
+        <div class="bodyparts_confirm">
           <button id="bodyparts_add_part"
                   onclick="add_bodypart()">
             Add bodypart
           </button>
-        </div>
-        <br/>
-        <div class="bodyparts_confirm">
-          <button id="bodyparts_export_button"
-                  onclick="bodyparts_export()">
-            Export
-          </button>
 
+          &nbsp;
+          
           <button id="bodyparts_import_button"
                   onclick="bodyparts_import()">
             Import
+          </button>
+
+          <button id="bodyparts_export_button"
+                  onclick="bodyparts_export()">
+            Export
           </button>
 
           <button id="bodyparts_save_button"
@@ -229,6 +227,10 @@
             Cancel
           </button>
         </div>
+
+        <ul id="bodypart_list">
+        </ul>
+
       </div>
     </div>
 

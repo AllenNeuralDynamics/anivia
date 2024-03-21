@@ -7022,10 +7022,13 @@ function hide_bodyparts_editor_panel() {
 
 var bodypart_list = document.getElementById("bodypart_list");
 
-function create_bodyparts_editor_panel() {
+function create_bodyparts_editor_panel(bodyparts) {
+  if(!bodyparts) {
+    bodyparts = _anivia_bodyparts;
+  }
   bodypart_list.innerHTML = '';
-  for(var i=0; i<_anivia_bodyparts.length; i++) {
-    add_bodypart(_anivia_bodyparts[i]);
+  for(var i=0; i<bodyparts.length; i++) {
+    add_bodypart(bodyparts[i]);
   }
   show_bodyparts_editor_panel();
 }
@@ -7047,10 +7050,10 @@ function add_bodypart(item_name) {
   }
 }
 
-function bodyparts_save_edit() {
+function bodyparts_update_from_li() {
   var lis = bodypart_list.getElementsByTagName('li');
   var bodyparts = [];
-  
+
   for (var i = 0; i < lis.length; i++) {
     var span = lis[i].getElementsByTagName('span')[0];
     var item = span.textContent;
@@ -7058,6 +7061,11 @@ function bodyparts_save_edit() {
   }
   console.log(bodyparts);
   _anivia_bodyparts = bodyparts;
+  return bodyparts;
+}
+
+function bodyparts_save_edit() {
+  bodyparts_update_from_li();
   hide_bodyparts_editor_panel()
 }
   
@@ -7084,18 +7092,16 @@ function bodyparts_actually_import(event) {
   if(ext == ".toml") {
     // import toml file, read bodyparts attribute
     load_text_file(file, function(text) {
-      let json = window.toml.parse(text);
+      let json = TOML.parse(text);
       console.log(json['bodyparts']);
-      _anivia_bodyparts = json['bodyparts'];
-      create_bodyparts_editor_panel();
+      create_bodyparts_editor_panel(json['bodyparts']);
     })
   } else if(ext == ".yaml") {
     // import yaml file, read bodyparts attribute
     load_text_file(file, function(text) {
       let json = YAML.parse(text);
       console.log(json['bodyparts']);
-      _anivia_bodyparts = json['bodyparts'];
-      create_bodyparts_editor_panel();
+      create_bodyparts_editor_panel(json['bodyparts']);
     })
   }
 }
@@ -7105,6 +7111,11 @@ function bodyparts_export() {
   // save the csv
   // similar to the code following:
   //   download_all_region_data('lp', 'csv')
+  let bodyparts = bodyparts_update_from_li();
+  var blob_attr = {type: 'text/toml;charset=utf-8'};
+  var text = TOML.stringify({"bodyparts": bodyparts})
+  var all_region_data_blob = new Blob([text], blob_attr);
+  save_data_to_local_file(all_region_data_blob, "bodyparts.toml");
 }
 
                    
