@@ -33,6 +33,7 @@
     <meta name="author" content="Abhishek Dutta">
     <meta name="description" content="VIA is a standalone image annotator application packaged as a single HTML file (< 400 KB) that runs on most modern web browsers.">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.0.3/css/dataTables.bootstrap4.min.css">
 
     <!--
     Development of VIA is supported by the EPSRC programme grant
@@ -275,15 +276,11 @@
 
           <li>Import
             <ul>
+              <li onclick="sel_s3_images()" title="Load files from S3">Load files from S3</li>
+              <li class="submenu_divider"></li>
               <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
               <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>
               <li onclick="sel_local_slp()" title="Load SLP file">Load SLEAP dataset (SLP file)</li>
-              <li class="submenu_divider"></li>
-              <li onclick="sel_s3_images()" title="Load files from S3">Load files from S3</li>
-              <!-- TODO: the following S3 options are not yet implemented -->
-              <!-- <li onclick="sel_s3_deeplabcut()" title="Load DeepLabCut dataset from S3">Load DeepLabCut dataset from S3</li>
-              <li onclick="sel_s3_lightning_pose()" title="Load Lightning Pose dataset from S3">Load Lightning Pose dataset from S3</li>
-              <li onclick="sel_s3_slp()" title="Load SLP file from S3">Load SLEAP dataset (SLP file) from S3</li> -->
               <li class="submenu_divider"></li>
               <li onclick="sel_local_data_file('annotations')" title="Import annotations from a CSV file">Import annotations (from csv)</li>
               <li onclick="sel_local_data_file('annotations')" title="Import annotations from a JSON file">Import annotations (from json)</li>
@@ -906,11 +903,13 @@ POSSIBILITY OF SUCH DAMAGE.
     <!-- DEMO SCRIPT AUTOMATICALLY INSERTED BY VIA PACKER SCRIPT -->
     <script src="via.js"></script>
 
-    <!---AWS Cognito for auth -->
+    <!---AWS Cognito and S3 -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/6.0.0/bootbox.js"></script>
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.207.0.min.js"></script>
+    <script src="https://cdn.datatables.net/2.0.3/js/dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/2.0.3/js/dataTables.bootstrap4.min.js"></script>
     <script src="cognito.js"></script>
   </body>
 </html>

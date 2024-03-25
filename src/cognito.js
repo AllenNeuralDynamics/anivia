@@ -1,9 +1,10 @@
 /**
- * This file contains the JavaScript code for accessing AWS Cognito services.
+ * This file contains the JavaScript code for accessing AWS Cognito and AWS S3 services.
  * Cognito is used for AIND user authentication and authorization.
+ * S3 is used for storing and retrieving data from the AIND Anivia Data bucket(s).
  * 
  * Links:
- * - AWS JavaScript SDK: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/
+ * - AWS JavaScript SDKv2: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/
  */
 
 // ========== AWS CONFIGURATION AND SETUP ====================
@@ -192,35 +193,59 @@ function cognitoSignOutCallback(err) {
 
 // ========== S3 UI ====================
 /**
- * Prompt user to select files from anivia S3 bucket.
- * First checks if user is logged in, and prompts for login if not.
+ * Modal to prompt user to select files from anivia S3 bucket.
+ * First prompts user to log in if not already logged in.
+ * Initializes a DataTable to display S3 objects.
  */
 function sel_s3_images() {
   if (currentUser.username === '') {
     promptLogin(sel_s3_images);
     return;
   }
-  // TODO: switch from listing contents to displaying in file explorer
-  (s3exp_lister = s3list()).go();
+  bootbox.confirm({
+    title: `Select from AWS S3 (${S3_BUCKET_NAME})`,
+    message:
+    "<table class='table table-bordered table-hover table-striped' id='tb-s3objects' style='width:100%'>\
+      <thead><tr><th>Object</th><th>Last Modified</th><th>Size</th></tr></thead>\
+      <tbody id='tbody-s3objects'></tbody>\
+    </table>",
+    size: 'extra-large',
+    onShow: () => {
+      $('#tb-s3objects').DataTable({
+        iDisplayLength: 10,
+        order: [[1, 'asc'], [0, 'asc']],
+        aoColumnDefs: [
+          { "aTargets": [0], "mData": "Key" },
+          { "aTargets": [1], "mData": "LastModified" },
+          { "aTargets": [2], "mData": "Size" }
+        ]
+      });
+      (s3exp_lister = s3list()).go();
+    },
+    buttons: {
+      confirm: { label: 'Select' },
+      cancel: { label: 'Cancel' }
+    },
+    callback: (result) => {
+      if (result) {
+        console.log("Selected S3 images");
+      } else {
+        console.log("Cancelled S3 selection.");
+      }
+    }
+  });
 }
 
-/**
- * TODO: Lists objects in an S3 bucket and displays them in a file explorer table.
- * @param {*} config 
- * @returns 
- */
 function s3list() {
   const completecb = (data) => {
-    // TODO: Callback function to draw the S3 object list into the table
+    // Callback function to draw the S3 object list into the table
     console.log(data.Contents);
+    $('#tb-s3objects').DataTable().rows.add(data.Contents).draw();
   }
-  var params = {
-    Bucket: S3_BUCKET_NAME,
-  };
   var scope = {
     Contents: [],
     CommonPrefixes: [],
-    params: params,
+    params: { Bucket: S3_BUCKET_NAME },
     stop: false,
     completecb: completecb
   };
@@ -230,7 +255,10 @@ function s3list() {
     cb: function (err, data) {
       if (err) {
         scope.stop = true;
-        bootbox.alert("Error accessing S3 bucket " + scope.params.Bucket + ". Error: " + err);
+        bootbox.alert({
+          title: `Error accessing S3 bucket ${scope.params.Bucket}`,
+          message: `Error: ${err.message}`,
+        });
       } else {
         scope.Contents.push.apply(scope.Contents, data.Contents);
         scope.CommonPrefixes.push.apply(scope.CommonPrefixes, data.CommonPrefixes);
@@ -247,6 +275,7 @@ function s3list() {
     },
     go: function () {
       scope.cb = this.cb;
+      $('#tb-s3objects').DataTable().clear();
       s3.makeRequest('listObjectsV2', scope.params, this.cb);
     },
     stop: function () {
