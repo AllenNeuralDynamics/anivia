@@ -15,6 +15,9 @@ const COGNITO_IDENTITY_POOL_ID = 'us-west-2:3723a551-9e26-4882-af4e-bcd0310b9885
 const COGNITO_LOGIN_KEY = `cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USERPOOL_ID}`;
 const S3_BUCKET_NAME = 'aind-anivia-data-dev';
 const S3_DELIMITER = '/';
+// TODO: check expiry times
+const S3_GET_SIGNED_URL_EXPIRY = 15;    // 15 seconds
+const S3_GET_SIGNED_URLS_EXPIRY = 300;  // 5min, extra for multiple urls
 
 if (!AWS.config.credentials) {
   // TODO: Check if this is necessary on non-local environments
@@ -27,14 +30,15 @@ if (!AWS.config.credentials) {
 }
 const INIT_AWS_CREDENTIALS = AWS.config.credentials;
 
+// global variables
 var currentUser = {
   username: '',
   userIdToken: '',
   userAccessToken: '',
 };
-var s3Prefix = '';
-var AWSCognito = new AWS.CognitoIdentityServiceProvider();
-var s3 = new AWS.S3();
+var s3Prefix = ''; // S3 prefix for current folder
+var AWSCognito = new AWS.CognitoIdentityServiceProvider(); // Cognito client
+var s3 = new AWS.S3(); // Default S3 client
 
 // ========== COGNITO FUNCTIONS ====================
 /**
@@ -73,7 +77,7 @@ function cognitoInitiateAuth(callback) {
  */
 function setTempCredentials(idToken, accessToken) {
   currentUser.userIdToken = idToken;
-  currentUser.userAccessToken = accessToken;    
+  currentUser.userAccessToken = accessToken;
   AWS.config.credentials = new AWS.CognitoIdentityCredentials({
     IdentityPoolId: COGNITO_IDENTITY_POOL_ID,
     Logins: {
@@ -132,7 +136,7 @@ function promptLogout() {
   bootbox.confirm({
     title: 'Log out',
     message: 'Are you sure?',
-    buttons: { confirm: { label: 'Log out'} },
+    buttons: { confirm: { label: 'Log out' } },
     callback: (result) => {
       if (result) {
         cognitoSignOut(cognitoSignOutCallback);
@@ -247,6 +251,61 @@ function s3list() {
   };
 }
 
+/**
+ * Loads a file or all files in a folder from S3 into the VIA app.
+ * Gets signed URL(s) for each S3 file based on the path.
+ * Calls the VIA project_file_add_url_input_done() with the URL(s) to load the file(s) into the app.
+ * @param {string} path - S3 path to file or folder
+ */
+function load_s3_into_app(path) {
+  const filepath = path.split('/').slice(1).join('/')
+  const isFolder = filepath.endsWith('/');
+  var inputForVia = {
+    'url': { value : '' },
+    'url_list': { value : '' }
+  };
+  // TODO: check if we want to use getSignedUrl or getObject directly
+  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property
+  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getObject-property
+  // TODO: resolve current issue with expiry for signed urls
+  // Currently, if user does not view the image within the expiry time, the image will not load
+  var params = {
+    Bucket: S3_BUCKET_NAME,
+    Expires: isFolder ? S3_GET_SIGNED_URLS_EXPIRY : S3_GET_SIGNED_URL_EXPIRY
+  };
+  if (isFolder) {
+    // get list of objects in this folder
+    s3.makeRequest('listObjectsV2', { Bucket: S3_BUCKET_NAME, Prefix: filepath }, (err, data) => {
+      if (err) {
+        console.error('err:', err);
+        bootbox.alert(`S3 Error: ${err.message}`);
+      } else {
+        // get pre-signed urls for each file in the folder
+        var urls = data.Contents.map(obj => {
+          params.Key = obj.Key;
+          return s3.getSignedUrl('getObject', params);
+        });
+        // call the VIA input_done function with the list of urls
+        inputForVia.url_list.value = urls.join('\n');
+        project_file_add_url_input_done(inputForVia);
+      }
+    });
+  } else {
+    // get pre-signed url for file
+    params.Key = filepath;
+    s3.getSignedUrl('getObject', params, (err, url) => {
+      if (err) {
+        console.error('err:', err);
+        bootbox.alert(`S3 Error: ${err.message}`);
+      } else {
+        // call the VIA input_done function with the url
+        inputForVia.url.value = url;
+        project_file_add_url_input_done(inputForVia);
+      }
+    });
+  }
+}
+
 // ========== S3 UI ====================
 /**
  * Modal to prompt user to select files from anivia S3 bucket.
@@ -271,14 +330,14 @@ function sel_s3_images() {
         ${S3_BUCKET_NAME}<span id='s3-prefix'>\
       </h4>\
       <div class='card-body'>\
-        <table class='table table-bordered table-hover' id='tb-s3objects' style='width:100%'>\
+        <table class='table-bordered table-hover compact' id='tb-s3objects' style='width:100%'>\
           <thead><tr><th>Object</th><th>Last Modified</th><th>Size</th></tr></thead>\
           <tbody id='tbody-s3objects'></tbody>\
         </table>\
       </div>\
     </div>`,
     required: 'true',
-    placeholder: 'Please select a folder by CLICKING in the browser above.',
+    placeholder: 'Please select a file or folder by CLICKING in the browser above.',
     size: 'extra-large',
     onShow: () => {
       // Initialize UI including rendering folders as clickable buttons
@@ -290,11 +349,18 @@ function sel_s3_images() {
           {
             "aTargets": [0], "mData": "Key",
             "mRender": (data, type) => {
-              if (type === 'display' && data.endsWith('/')) {
-                let folderName = data.split('/').slice(-2)[0] + '/';
-                return `<button type="button" class="btn btn-link" data-s3="folder" data-prefix="${data}">${folderName}</button>`;
-              }
-              return (type === 'display') ? data.split('/').slice(-1)[0]: data;
+              if (type === 'display') {
+                // display folders as clickable buttons, otherwise display file as span
+                // both have the key as data-path
+                if (data.endsWith('/')) {
+                  let folderName = data.split('/').slice(-2)[0] + '/';
+                  return `<button type="button" class="btn btn-link" data-s3="folder" data-path="${data}">${folderName}</button>`;
+                } else {
+                  let fileName = data.split('/').slice(-1)[0];
+                  return `<span data-s3="object" data-path="${data}">${fileName}</button>`;
+                }
+              } 
+              return data;
             }
           },
           { "aTargets": [1], "mData": "LastModified", "mRender": (data) => { return data ?? "" } },
@@ -310,7 +376,7 @@ function sel_s3_images() {
     callback: (result) => {
       if (result) {
         console.log("Selected S3 folder: " + result);
-        // TODO: load selected folder into app
+        load_s3_into_app(result);
       }
       // Reset s3Prefix for next selection
       s3Prefix = '';
@@ -321,11 +387,11 @@ function sel_s3_images() {
   // Clickable folder button to update global s3Prefix and refresh the DataTable
   $('#tb-s3objects').on('click', 'tbody td button', e => {
     e.preventDefault();
-    s3Prefix = e.target.dataset.prefix;
+    s3Prefix = e.target.dataset.path;
     s3list().go();
   });
 
-  // Clickable rows for folder row selection
+  // Clickable rows for row selection (user can select a folder or file row)
   $('#tb-s3objects').on('click', 'tbody tr', (e) => {
     e.preventDefault();
     let classList = e.currentTarget.classList;
@@ -333,20 +399,24 @@ function sel_s3_images() {
     // If row is already selected, deselect it and revert input to default
     if (classList.contains('selected')) {
       classList.remove('selected');
+      classList.remove('bg-primary')
       folderElement.classList.remove('text-white');
       $('.bootbox-input-text').val(s3Prefix ? [S3_BUCKET_NAME, s3Prefix].join('/') : '');
-      console.log(folderElement.dataset.prefix + ' deselected');
+      console.log(folderElement.dataset.path + ' deselected');
     }
-    // If selecting a new folder row, clear other selections, select the new row, and update input
-    else if (folderElement.dataset?.s3 === "folder") {
+    // Otherwise, clear other selections, select the new row, and update input
+    // NOTE: to only allow folders, check folderElement.dataset?.s3 === "folder"
+    else {
       $('#tb-s3objects').DataTable().rows('.selected').nodes().each((row) => {
         row.classList.remove('selected')
+        row.classList.remove('bg-primary')
         row.firstChild.firstChild.classList.remove('text-white');
       });
       classList.add('selected');
+      classList.add('bg-primary');
       folderElement.classList.add('text-white');
-      $('.bootbox-input-text').val([S3_BUCKET_NAME, folderElement.dataset.prefix].join('/'));
-      console.log(folderElement.dataset.prefix + ' selected');
+      $('.bootbox-input-text').val([S3_BUCKET_NAME, folderElement.dataset.path].join('/'));
+      console.log(folderElement.dataset.path + ' selected');
     }
   });
 
