@@ -14,6 +14,7 @@ const COGNITO_USERPOOL_ID = 'us-west-2_ii4G6y7Qk';
 const COGNITO_IDENTITY_POOL_ID = 'us-west-2:3723a551-9e26-4882-af4e-bcd0310b9885';
 const COGNITO_LOGIN_KEY = `cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USERPOOL_ID}`;
 const S3_BUCKET_NAME = 'aind-anivia-data-dev';
+const S3_DELIMITER = '/';
 
 if (!AWS.config.credentials) {
   // TODO: Check if this is necessary on non-local environments
@@ -31,9 +32,9 @@ var currentUser = {
   userIdToken: '',
   userAccessToken: '',
 };
+var s3Prefix = '';
 var AWSCognito = new AWS.CognitoIdentityServiceProvider();
 var s3 = new AWS.S3();
-var s3exp_lister = null;
 
 // ========== COGNITO FUNCTIONS ====================
 /**
@@ -191,63 +192,23 @@ function cognitoSignOutCallback(err) {
   }
 }
 
-// ========== S3 UI ====================
+// ========== S3 FUNCTIONS ====================
 /**
- * Modal to prompt user to select files from anivia S3 bucket.
- * First prompts user to log in if not already logged in.
- * Initializes a DataTable to display S3 objects.
+ * Wrapper for S3.listObjectsV2.
+ * Uses the global S3 client to make an authenticated listObjectsV2 request.
+ * Uses custom s3draw callback to update the UI.
  */
-function sel_s3_images() {
-  if (currentUser.username === '') {
-    promptLogin(sel_s3_images);
-    return;
-  }
-  bootbox.confirm({
-    title: `Select from AWS S3 (${S3_BUCKET_NAME})`,
-    message:
-    "<table class='table table-bordered table-hover table-striped' id='tb-s3objects' style='width:100%'>\
-      <thead><tr><th>Object</th><th>Last Modified</th><th>Size</th></tr></thead>\
-      <tbody id='tbody-s3objects'></tbody>\
-    </table>",
-    size: 'extra-large',
-    onShow: () => {
-      $('#tb-s3objects').DataTable({
-        iDisplayLength: 10,
-        order: [[1, 'asc'], [0, 'asc']],
-        aoColumnDefs: [
-          { "aTargets": [0], "mData": "Key" },
-          { "aTargets": [1], "mData": "LastModified" },
-          { "aTargets": [2], "mData": "Size" }
-        ]
-      });
-      (s3exp_lister = s3list()).go();
-    },
-    buttons: {
-      confirm: { label: 'Select' },
-      cancel: { label: 'Cancel' }
-    },
-    callback: (result) => {
-      if (result) {
-        console.log("Selected S3 images");
-      } else {
-        console.log("Cancelled S3 selection.");
-      }
-    }
-  });
-}
-
 function s3list() {
-  const completecb = (data) => {
-    // Callback function to draw the S3 object list into the table
-    console.log(data.Contents);
-    $('#tb-s3objects').DataTable().rows.add(data.Contents).draw();
-  }
   var scope = {
     Contents: [],
     CommonPrefixes: [],
-    params: { Bucket: S3_BUCKET_NAME },
+    params: {
+      Bucket: S3_BUCKET_NAME,
+      Delimiter: S3_DELIMITER,
+      Prefix: s3Prefix,
+    },
     stop: false,
-    completecb: completecb
+    completecb: s3draw
   };
   return {
     // Callback that the S3 API makes when an S3 listObjectsV2 request completes (successfully or in error)
@@ -263,13 +224,12 @@ function s3list() {
         scope.Contents.push.apply(scope.Contents, data.Contents);
         scope.CommonPrefixes.push.apply(scope.CommonPrefixes, data.CommonPrefixes);
         if (scope.stop) {
-          console.log('Bucket ' + scope.params.Bucket + ' stopped');
+          console.log(`Bucket ${scope.params.Bucket} stopped`);
           return;
         } else if (data.IsTruncated) {
-          console.log('Bucket ' + scope.params.Bucket + ' truncated before complete');
+          console.log(`Bucket ${scope.params.Bucket} truncated before complete`);
         }
-        console.log('Retrieved ' + scope.Contents.length + ' objects from ' + scope.params.Bucket + ', including ' +
-          scope.CommonPrefixes.length + ' prefixes');
+        console.log(`Retrieved ${scope.Contents.length} objects from ${scope.params.Bucket}/${scope.params.Prefix ?? ''}, including ${scope.CommonPrefixes.length} folders`);
         scope.completecb(scope, true);
       }
     },
@@ -286,3 +246,154 @@ function s3list() {
     }
   };
 }
+
+// ========== S3 UI ====================
+/**
+ * Modal to prompt user to select files from anivia S3 bucket.
+ * First prompts user to log in if not already logged in.
+ * Initializes a DataTable to display S3 objects.
+ * Includes delegated event handlers for folder entry, selection, reset, and back buttons.
+ */
+function sel_s3_images() {
+  if (currentUser.username === '') {
+    promptLogin(sel_s3_images);
+    return;
+  }
+  bootbox.prompt({
+    title: "Select from AWS S3",
+    message:
+    `<div class='card'>\
+      <h4 class='card-header'>\
+        <div role='group' class='btn-group'>\
+          <button type='button' class='btn btn-outline-secondary' id='btn-s3-reset' disabled>Reset</button>\
+          <button type='button' class='btn btn-outline-secondary' id='btn-s3-back' disabled>Back</button>\
+        </div>\
+        ${S3_BUCKET_NAME}<span id='s3-prefix'>\
+      </h4>\
+      <div class='card-body'>\
+        <table class='table table-bordered table-hover' id='tb-s3objects' style='width:100%'>\
+          <thead><tr><th>Object</th><th>Last Modified</th><th>Size</th></tr></thead>\
+          <tbody id='tbody-s3objects'></tbody>\
+        </table>\
+      </div>\
+    </div>`,
+    required: 'true',
+    placeholder: 'Please select a folder by CLICKING in the browser above.',
+    size: 'extra-large',
+    onShow: () => {
+      // Initialize UI including rendering folders as clickable buttons
+      $('.bootbox-input-text').prop('readonly', true);
+      $('#tb-s3objects').DataTable({
+        iDisplayLength: 10,
+        order: [[1, 'asc'], [0, 'asc']],
+        aoColumnDefs: [
+          {
+            "aTargets": [0], "mData": "Key",
+            "mRender": (data, type) => {
+              if (type === 'display' && data.endsWith('/')) {
+                let folderName = data.split('/').slice(-2)[0] + '/';
+                return `<button type="button" class="btn btn-link" data-s3="folder" data-prefix="${data}">${folderName}</button>`;
+              }
+              return (type === 'display') ? data.split('/').slice(-1)[0]: data;
+            }
+          },
+          { "aTargets": [1], "mData": "LastModified", "mRender": (data) => { return data ?? "" } },
+          { "aTargets": [2], "mData": "Size", "mRender": (data) => { return data ?? "" } }
+        ]
+      });
+      s3list().go();
+    },
+    buttons: {
+      confirm: { label: 'Select' },
+      cancel: { label: 'Cancel' }
+    },
+    callback: (result) => {
+      if (result) {
+        console.log("Selected S3 folder: " + result);
+        // TODO: load selected folder into app
+      }
+      // Reset s3Prefix for next selection
+      s3Prefix = '';
+    }
+  });
+
+  // ========== DELEGATED EVENT HANDLERS ==========
+  // Clickable folder button to update global s3Prefix and refresh the DataTable
+  $('#tb-s3objects').on('click', 'tbody td button', e => {
+    e.preventDefault();
+    s3Prefix = e.target.dataset.prefix;
+    s3list().go();
+  });
+
+  // Clickable rows for folder row selection
+  $('#tb-s3objects').on('click', 'tbody tr', (e) => {
+    e.preventDefault();
+    let classList = e.currentTarget.classList;
+    let folderElement = e.currentTarget.firstChild.firstChild
+    // If row is already selected, deselect it and revert input to default
+    if (classList.contains('selected')) {
+      classList.remove('selected');
+      folderElement.classList.remove('text-white');
+      $('.bootbox-input-text').val(s3Prefix ? [S3_BUCKET_NAME, s3Prefix].join('/') : '');
+      console.log(folderElement.dataset.prefix + ' deselected');
+    }
+    // If selecting a new folder row, clear other selections, select the new row, and update input
+    else if (folderElement.dataset?.s3 === "folder") {
+      $('#tb-s3objects').DataTable().rows('.selected').nodes().each((row) => {
+        row.classList.remove('selected')
+        row.firstChild.firstChild.classList.remove('text-white');
+      });
+      classList.add('selected');
+      folderElement.classList.add('text-white');
+      $('.bootbox-input-text').val([S3_BUCKET_NAME, folderElement.dataset.prefix].join('/'));
+      console.log(folderElement.dataset.prefix + ' selected');
+    }
+  });
+
+  // Reset button to clear the current prefix and refresh the DataTable
+  $('#btn-s3-reset').on('click', (e) => {
+    e.preventDefault();
+    console.log("Reset button clicked");
+    s3Prefix = '';
+    s3list().go();
+  });
+
+  // Back button to navigate up one level and refresh the DataTable
+  $('#btn-s3-back').on('click', (e) => {
+    e.preventDefault();
+    console.log("Back button clicked");
+    if (s3Prefix) {
+      const parentPrefix = s3Prefix.split('/').slice(0, -2).join('/') + '/';
+      s3Prefix = (parentPrefix === '/') ? '' : parentPrefix
+      s3list().go();
+    }
+  });
+}
+
+// Callback function to draw results from s3list into the table and update the UI
+function s3draw(data, complete) {
+  // Update header and default input
+  // Enable/disable reset and back buttons
+  if (data.params.Prefix) {
+    $('#s3-prefix').text(`/${data.params.Prefix}`);
+    $('.bootbox-input-text').val([S3_BUCKET_NAME, data.params.Prefix].join('/'));
+    $('#btn-s3-reset').prop('disabled', false);
+    $('#btn-s3-back').prop('disabled', false);
+  } else {
+    $('#s3-prefix').text('');
+    $('.bootbox-input-text').val('');
+    $('#btn-s3-reset').prop('disabled', true);
+    $('#btn-s3-back').prop('disabled', true);
+  }
+  // Add common prefixes (folders at this level) to DataTable
+  $.each(data.CommonPrefixes, function (i, prefix) {
+    $('#tb-s3objects').DataTable().rows.add([{
+      Key: prefix.Prefix
+    }]);
+  });
+  // Add S3 objects to DataTable (filters out the current folder)
+  $('#tb-s3objects').DataTable().rows.add(
+    data.Contents.filter(el => el.Key !== data.params.Prefix)
+  ).draw();
+}
+
