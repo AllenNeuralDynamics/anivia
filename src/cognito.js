@@ -15,9 +15,6 @@ const COGNITO_IDENTITY_POOL_ID = 'us-west-2:3723a551-9e26-4882-af4e-bcd0310b9885
 const COGNITO_LOGIN_KEY = `cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USERPOOL_ID}`;
 const S3_BUCKET_NAME = 'aind-anivia-data-dev';
 const S3_DELIMITER = '/';
-// TODO: check expiry times
-const S3_GET_SIGNED_URL_EXPIRY = 15;    // 15 seconds
-const S3_GET_SIGNED_URLS_EXPIRY = 300;  // 5min, extra for multiple urls
 
 if (!AWS.config.credentials) {
   // TODO: Check if this is necessary on non-local environments
@@ -252,55 +249,63 @@ function s3list() {
 }
 
 /**
- * Loads a file or all files in a folder from S3 into the VIA app.
- * Gets signed URL(s) for each S3 file based on the path.
- * Calls the VIA project_file_add_url_input_done() with the URL(s) to load the file(s) into the app.
+ * Loads files from S3 into the VIA app.
+ * If the input path is a folder, load all files in the folder by first calling s3.listObjectsV2 to get the list of objects.
+ * For each file, call s3.getObject to get the file and create a new File object.
+ * Calls project_file_add_local() function to add the file(s) to the VIA app.
  * @param {string} path - S3 path to file or folder
  */
 function load_s3_into_app(path) {
   const filepath = path.split('/').slice(1).join('/')
   const isFolder = filepath.endsWith('/');
-  var inputForVia = {
-    'url': { value : '' },
-    'url_list': { value : '' }
-  };
-  // TODO: check if we want to use getSignedUrl or getObject directly
-  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getSignedUrl-property
-  // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html#getObject-property
-  // TODO: resolve current issue with expiry for signed urls
-  // Currently, if user does not view the image within the expiry time, the image will not load
   var params = {
     Bucket: S3_BUCKET_NAME,
-    Expires: isFolder ? S3_GET_SIGNED_URLS_EXPIRY : S3_GET_SIGNED_URL_EXPIRY
+    Key: filepath
   };
+  var fakeEvent = { target: { files: [] } };
   if (isFolder) {
     // get list of objects in this folder
-    s3.makeRequest('listObjectsV2', { Bucket: S3_BUCKET_NAME, Prefix: filepath }, (err, data) => {
+    s3.makeRequest('listObjectsV2', { Bucket: S3_BUCKET_NAME, Prefix: filepath }, async (err, data) => {
       if (err) {
         console.error('err:', err);
         bootbox.alert(`S3 Error: ${err.message}`);
       } else {
-        // get pre-signed urls for each file in the folder
-        var urls = data.Contents.map(obj => {
-          params.Key = obj.Key;
-          return s3.getSignedUrl('getObject', params);
+        // get each file, then add all files to VIA
+        var files = [];
+        await Promise.all(data.Contents.map((obj) => {
+          let filepath = obj.Key;
+          return new Promise((resolve, reject) => {
+            params.Key = filepath;
+            s3.makeRequest('getObject', params, (err, data) => {
+              if (err) {
+                console.error('err:', err);
+                reject(err);
+              } else {
+                console.log('data:', data);
+                var file = new File([data.Body], filepath, { type: data.ContentType });
+                files.push(file);
+                resolve(file);
+              }
+            });
+          });
+        })).then((files) => {
+          fakeEvent.target.files = files;
+          project_file_add_local(fakeEvent);
+        }).catch((err) => {
+          console.error('err:', err);
+          bootbox.alert(`S3 Download Error: ${err.message}`);
         });
-        // call the VIA input_done function with the list of urls
-        inputForVia.url_list.value = urls.join('\n');
-        project_file_add_url_input_done(inputForVia);
       }
     });
   } else {
-    // get pre-signed url for file
-    params.Key = filepath;
-    s3.getSignedUrl('getObject', params, (err, url) => {
+    s3.makeRequest('getObject', params, (err, data) => {
       if (err) {
         console.error('err:', err);
         bootbox.alert(`S3 Error: ${err.message}`);
       } else {
-        // call the VIA input_done function with the url
-        inputForVia.url.value = url;
-        project_file_add_url_input_done(inputForVia);
+        var file = new File([data.Body], filepath, { type: data.ContentType });
+        fakeEvent.target.files = [file];
+        project_file_add_local(fakeEvent);
       }
     });
   }
@@ -359,7 +364,7 @@ function sel_s3_images() {
                   let fileName = data.split('/').slice(-1)[0];
                   return `<span data-s3="object" data-path="${data}">${fileName}</button>`;
                 }
-              } 
+              }
               return data;
             }
           },
