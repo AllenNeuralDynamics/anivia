@@ -276,7 +276,10 @@
 
           <li>Import
             <ul>
-              <li onclick="sel_s3_images()" title="Load files from S3">Load files from S3</li>
+              <li onclick="sel_s3_images('deeplabcut')" title="Load DeepLabCut dataset from S3">S3: Load DeepLabCut dataset</li>
+              <li onclick="sel_s3_images('lightning_pose')" title="Load Lightning Pose dataset from S3">S3: Load Lightning Pose dataset</li>
+              <li onclick="sel_s3_images('slp')" title="Load SLP file from S3">S3: Load SLEAP dataset (SLP file)</li>
+              <li onclick="sel_s3_images()" title="Load image files/folder from S3">S3: Load image file/folder</li>
               <li class="submenu_divider"></li>
               <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
               <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>

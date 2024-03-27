@@ -49,7 +49,7 @@ var s3 = new AWS.S3();                                      // Default S3 client
 // ==================== COGNITO FUNCTIONS ====================
 /**
  * Wrapper for AWS.CognitoServiceProvider.globalSignOut()
- * @param {*} callback - custom callback function (default to cognitoSignOutCallback)
+ * @param {function} callback - custom callback function (default to cognitoSignOutCallback)
  */
 function cognitoSignOut(callback = cognitoSignOutCallback) {
   var params = {
@@ -60,7 +60,7 @@ function cognitoSignOut(callback = cognitoSignOutCallback) {
 
 /**
  * Wrapper for AWS.CognitoServiceProvider.initiateAuth()
- * @param {*} callback - custom callback function
+ * @param {function} callback - custom callback function
  */
 function cognitoInitiateAuth(callback) {
   currentUser.username = $('#username').val();
@@ -112,7 +112,7 @@ function resetTempCredentials() {
 // ==================== COGNITO UI ====================
 /**
  * Prompt user for login credentials.
- * @param {*} successCallback - Optional callback function to execute after successful login.
+ * @param {function | null} successCallback - Optional callback function to execute after successful login.
  */
 function promptLogin(successCallback = null) {
   bootbox.confirm({
@@ -161,7 +161,7 @@ function promptLogout() {
  * Otherwise, re-prompt for login.
  * @param {*} err - Error object
  * @param {*} result - AuthenticationResult object
- * @param {*} successCallback - Optional callback function to execute after successful login.
+ * @param {function | null} successCallback - Optional callback function to execute after successful login.
  */
 function cognitoInititateAuthCallback(err, result, successCallback = null) {
   if (err) {
@@ -207,7 +207,7 @@ function cognitoSignOutCallback(error) {
 /**
  * Wrapper for AWS.S3.listObjectsV2.
  * Uses the global S3 client to make an authenticated listObjectsV2 request.
- * @param {*} callback - Callback function (defaults to use s3draw() to update the UI)
+ * @param {function} callback - Callback function (defaults to use s3draw() to update the UI)
  */
 function s3list(callback = s3draw) {
   var scope = {
@@ -261,30 +261,34 @@ function s3list(callback = s3draw) {
  * For each file, call AWS.S3.getObject to get the file.
  * Calls project_file_add_local() function from via.js to add the file(s) to the app.
  * @param {string} path - S3 path to file or folder
+ * @param {string} loadType - project load option (options are 'deeplabcut', 'lightning_pose', 'slp', 'local')
  */
-function load_s3_into_app(path) {
-  const filepath = path.split('/').slice(1).join('/')
-  var params = {
+function load_s3_into_app(path, loadType) {
+  path = path.replace(S3_BUCKET_NAME + '/', ''); // remove bucket name prefix
+  var s3Params = {
     Bucket: S3_BUCKET_NAME,
-    Key: filepath
+    Key: path
   };
   var fakeEvent = { target: { files: [] } };
-  if (pathIsFolder(filepath)) {
+  var project_file_callback = getViaProjectFileCallback(loadType);
+  if (pathIsFolder(path)) {
     // get list of objects in this folder
-    s3.makeRequest('listObjectsV2', { Bucket: S3_BUCKET_NAME, Prefix: filepath }, async (err, data) => {
+    s3.makeRequest('listObjectsV2', { Bucket: S3_BUCKET_NAME, Prefix: path }, async (err, data) => {
       if (err) {
         logErrorAndAlertUser("S3 Error", err)
       } else {
+        const parentPrefix = getParentFolderFromPath(path);
         // get each file, then add all files to VIA
         await Promise.all(data.Contents.map((obj) => {
           let filepath = obj.Key;
           return new Promise((resolve, reject) => {
-            params.Key = filepath;
-            s3.makeRequest('getObject', params, (err, data) => {
+            s3Params.Key = filepath;
+            s3.makeRequest('getObject', s3Params, (err, data) => {
               if (err) {
                 reject(err);
               } else {
-                var file = new File([data.Body], filepath, { type: data.ContentType });
+                var file = new File([data.Body], getFileOrFolderNameFromPath(filepath), { type: data.ContentType });
+                file.s3RelativePath = filepath.replace(parentPrefix, ''); // preserve relative path
                 resolve(file);
               }
             });
@@ -292,21 +296,21 @@ function load_s3_into_app(path) {
         })).then((files) => {
           console.log(`Retrieved ${files.length} files from ${path}`)
           fakeEvent.target.files = files;
-          project_file_add_local(fakeEvent);
+          project_file_callback(fakeEvent, true);
         }).catch((err) => {
           logErrorAndAlertUser("S3 Download Error", err)
         });
       }
     });
   } else {
-    s3.makeRequest('getObject', params, (err, data) => {
+    s3.makeRequest('getObject', s3Params, (err, data) => {
       if (err) {
         logErrorAndAlertUser("S3 Error", err)
       } else {
         console.log(`Retrieved file from ${path}`)
-        var file = new File([data.Body], filepath, { type: data.ContentType });
+        var file = new File([data.Body], getFileOrFolderNameFromPath(path), { type: data.ContentType });
         fakeEvent.target.files = [file];
-        project_file_add_local(fakeEvent);
+        project_file_callback(fakeEvent, true);
       }
     });
   }
@@ -318,10 +322,11 @@ function load_s3_into_app(path) {
  * First prompts user to log in if not already logged in.
  * Initializes a DataTable to display S3 objects.
  * Includes delegated event handlers for folder entry, selection, reset, and back buttons.
+ * @param {string} loadType - project load option (default to 'local', other options are 'deeplabcut', 'lightning_pose', 'slp')
  */
-function sel_s3_images() {
+function sel_s3_images(loadType = 'local') {
   if (currentUser.username === '') {
-    promptLogin(sel_s3_images);
+    promptLogin(sel_s3_images.bind(null, loadType));
     return;
   }
   bootbox.prompt({
@@ -358,11 +363,9 @@ function sel_s3_images() {
               if (type === 'display') {
                 // Display clickable folders or text span for file. Both have the key as data-path
                 if (pathIsFolder(data)) {
-                  let folderName = data.split('/').slice(-2)[0] + '/';
-                  return `<button type="button" class="btn btn-link" data-s3="folder" data-path="${data}">${folderName}</button>`;
+                  return `<button type="button" class="btn btn-link" data-s3="folder" data-path="${data}">${getFileOrFolderNameFromPath(data)}</button>`;
                 } else {
-                  let fileName = data.split('/').slice(-1)[0];
-                  return `<span data-s3="object" data-path="${data}">${fileName}</button>`;
+                  return `<span data-s3="object" data-path="${data}">${getFileOrFolderNameFromPath(data)}</button>`;
                 }
               }
               return data;
@@ -379,7 +382,7 @@ function sel_s3_images() {
     },
     callback: (result) => {
       if (result) {
-        load_s3_into_app(result);
+        load_s3_into_app(result, loadType);
       }
       // Reset s3Prefix for next selection
       s3Prefix = '';
@@ -434,7 +437,7 @@ function sel_s3_images() {
     e.preventDefault();
     console.log("Back button clicked");
     if (s3Prefix) {
-      const parentPrefix = s3Prefix.split('/').slice(0, -2).join('/') + '/';
+      const parentPrefix = getParentFolderFromPath(s3Prefix);
       s3Prefix = (parentPrefix === '/') ? '' : parentPrefix
       s3list().go();
     }
@@ -491,6 +494,34 @@ function pathIsFolder(path) {
 }
 
 /**
+ * Extracts the filename or folder name from a full path.
+ * E.g. getFilenameFromPath('path/to/file.txt') => 'file.txt'
+ * E.g. getFilenameFromPath('path/to/folder/') => 'folder/'
+ * @param {string} path - The full path
+ * @returns - The filename or folder name
+ */
+function getFileOrFolderNameFromPath(path) {
+  if (pathIsFolder(path))
+    return path.split('/').slice(-2)[0] + '/'
+  else
+    return path.split('/').slice(-1)[0];
+}
+
+/**
+ * Extracts the parent folder from a full path.
+ * E.g. getParentFolderFromPath('path/to/file.txt') => 'path/to/'
+ * E.g. getParentFolderFromPath('path/to/folder/') => 'path/to/'
+ * @param {string} path - The full path
+ * @returns - The parent folder path
+ */
+function getParentFolderFromPath(path) {
+  if (pathIsFolder(path))
+    return path.split('/').slice(0, -2).join('/') + '/';
+  else
+    return path.split('/').slice(0, -1).join('/') + '/';
+}
+
+/**
  * Logs error and alerts the user with an error message.
  * 
  * @param {string} title - The title of the error.
@@ -502,4 +533,23 @@ function logErrorAndAlertUser(title, error) {
     title: title,
     error: `Error: ${error.message}`
   })
+}
+
+/**
+ * Returns the appropriate VIA project_file_add function based on the loadType.
+ * 
+ * @param {string} loadType - The type of project load. Options are 'deeplabcut', 'lightning_pose', 'slp', or 'local'.
+ * @returns - The appropriate VIA project_file_add function.
+ */
+function getViaProjectFileCallback(loadType) {
+  switch (loadType) {
+    case 'deeplabcut':
+      return project_file_add_deeplabcut;
+    case 'lightning_pose':
+      return project_file_add_lightning_pose;
+    case 'slp':
+      return project_file_add_slp;
+    default:
+      return project_file_add_local;
+  }
 }
