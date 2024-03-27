@@ -259,9 +259,9 @@ function s3list(callback = s3draw) {
  * Loads files from S3 into the VIA app.
  * If target path is a folder, load all files in the folder by first calling AWS.S3.listObjectsV2to get folder contents.
  * For each file, call AWS.S3.getObject to get the file.
- * Calls project_file_add_local() function from via.js to add the file(s) to the app.
+ * Calls appropriate project_file_callback function from via.js based on input loadType to add the file(s) to the app.
  * @param {string} path - S3 path to file or folder
- * @param {string} loadType - project load option (options are 'deeplabcut', 'lightning_pose', 'slp', 'local')
+ * @param {string} loadType - project load option (options are 'deeplabcut', 'lightning_pose', 'slp', 'file/folder')
  */
 function load_s3_into_app(path, loadType) {
   path = path.replace(S3_BUCKET_NAME + '/', ''); // remove bucket name prefix
@@ -322,15 +322,15 @@ function load_s3_into_app(path, loadType) {
  * First prompts user to log in if not already logged in.
  * Initializes a DataTable to display S3 objects.
  * Includes delegated event handlers for folder entry, selection, reset, and back buttons.
- * @param {string} loadType - project load option (default to 'local', other options are 'deeplabcut', 'lightning_pose', 'slp')
+ * @param {string} loadType - project load option (default to 'file/folder', other options are 'deeplabcut', 'lightning_pose', 'slp')
  */
-function sel_s3_images(loadType = 'local') {
+function sel_s3_images(loadType = 'file/folder') {
   if (currentUser.username === '') {
     promptLogin(sel_s3_images.bind(null, loadType));
     return;
   }
   bootbox.prompt({
-    title: "Load from AWS S3",
+    title: `Load ${loadType} from AWS S3`,
     message:
       `<div class='card'>\
         <h4 class='card-header'>\
@@ -538,7 +538,7 @@ function logErrorAndAlertUser(title, error) {
 /**
  * Returns the appropriate VIA project_file_add function based on the loadType.
  * 
- * @param {string} loadType - The type of project load. Options are 'deeplabcut', 'lightning_pose', 'slp', or 'local'.
+ * @param {string} loadType - The type of project load. Options are 'deeplabcut', 'lightning_pose', 'slp', or 'file/folder'.
  * @returns - The appropriate VIA project_file_add function.
  */
 function getViaProjectFileCallback(loadType) {
