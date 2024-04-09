@@ -322,6 +322,10 @@ var _anivia_num_instances = 0; // number of instances, updated by image
 
 var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
 
+// Variables for 3D annotation
+var calib_params = {};
+var _anivia_3d_enabled = false;
+
 //
 // Data structure to store metadata about file and regions
 //
@@ -533,6 +537,12 @@ function show_image_grid_view() {
   } else {
     set_display_area_content(VIA_DISPLAY_AREA_CONTENT_NAME.PAGE_START_INFO);
   }
+}
+
+function toggle_3d_annotation() {
+  // this will enable the 3d annotation viewer
+  _anivia_3d_enabled = true;
+  // TODO: more things presumably to enable the multiple views
 }
 
 //
@@ -8773,24 +8783,29 @@ function project_file_add_anipose(event) {
     // Both calibration and config are loaded now, you can use them here
     console.log('Calibration:', calibration);
     console.log('Config:', config);
-
+    
     // load the regex, cropping parameters, and calibration
     // into our internal format
+
+    // load calibration
+    calib_params = {camera_order: [], cameras: {}};
+
+    for(var key of Object.keys(calibration)) {
+      if(key.substr(0, 3) != "cam") continue;
+      var value = calibration[key];
+      calib_params['cameras'][value['name']] = value;
+      calib_params['camera_order'].push(value['name']);
+    }
+
+    // load config params
+    calib_params['cam_regex'] = config['triangulation']['cam_regex'];
+    calib_params['offsets'] = {};
+    for(var key of Object.keys(config['cameras'])) {
+      calib_params['offsets'][key] = config['cameras'][key]['offset'];
+    }
   }).catch((error) => {
     console.error('Error loading files:', error);
   });
-
-  // var calibration;
-  // load_text_file(calib_file, function(text) {
-  //   calibration = TOML.parse(text);
-  //   window.calibration = calibration;
-  // });
-
-  // var config;
-  // load_text_file(calib_file, function(text) {
-  //   config = TOML.parse(text);
-  //   window.config = config;
-  // });
 
 }
 

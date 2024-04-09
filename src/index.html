@@ -442,6 +442,13 @@
             </div>
           </div>
           <div id="img_fn_list"></div>
+
+          <p>
+            <div class="button_panel">
+              <span class="button" onclick="toggle_3d_annotation()" title="toggle 3d annotation">Toggle 3D annotation</span>
+            </div>
+          </p>
+
           <!-- <p>
                <div class="button_panel">
                <span class="button" onclick="sel_local_images()" title="Add new file from local disk">Add Files</span>
@@ -578,6 +585,14 @@
           <!-- @todo: in future versions, this canvas will be replaced by a <svg> element -->
             <canvas id="region_canvas" width="1" height="1" tabindex="1">Sorry, your browser does not support HTML5 Canvas functionality which is required for this application.</canvas>
             <!-- here, a child div with id="annotation_editor" is added by javascript -->
+
+            <div id="other_views_panel" class="display_none">
+              <!--- simple image panels are added here to display other images -->
+            </div>
+
+            <div id="3d_model_panel">
+              <!-- placeholder panel to put in a 3d viewer -->
+            </div>
         </div>
         <div id="image_grid_panel" class="display_area_content display_none">
 
