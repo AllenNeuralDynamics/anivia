@@ -541,8 +541,19 @@ function show_image_grid_view() {
 
 function toggle_3d_annotation() {
   // this will enable the 3d annotation viewer
-  _anivia_3d_enabled = true;
+  _anivia_3d_enabled = !_anivia_3d_enabled;
   // TODO: more things presumably to enable the multiple views
+  const other_views_panel = document.getElementById("other_views_panel");
+  const model_panel = document.getElementById("3d_model_panel");
+  if(_anivia_3d_enabled) {
+    other_views_panel.classList.remove('display_none');
+    model_panel.classList.remove('display_none');
+  } else {
+    other_views_panel.classList.add('display_none');
+    model_panel.classList.add('display_none');
+  }
+
+  _via_show_img(_via_image_index);
 }
 
 //
@@ -8714,6 +8725,8 @@ function project_file_add_anipose(event) {
         fullpath = fullpath + name;
 
         var new_img_id = project_add_new_file(fullpath);
+        _via_img_metadata[new_img_id].camera = folder;
+        _via_img_metadata[new_img_id].name = name;
         _via_img_fileref[new_img_id] = files[i];
         set_file_annotations_to_default_value(new_img_id);
         new_img_index_list.push( _via_image_id_list.indexOf(new_img_id) );
@@ -8762,7 +8775,7 @@ function project_file_add_anipose(event) {
     }
   }
 
-  // load the images
+  // load the annotations
   
 
   // promises to load both calib and config files 
@@ -10609,6 +10622,107 @@ function _via_show_img(img_index) {
   }
 
   recalculate_anivia_instance_nums(img_id);
+
+  if ( _anivia_3d_enabled ) {
+    // TODO: code to draw the other views
+    // - figure out what the other views are
+    var other_indices = find_other_views(img_index);
+    // - draw the other views in the appropriate image panels
+    show_other_views(other_indices);
+    
+    // TODO: code to draw the 3D model
+    // - triangulate the 3D points from the 2D points
+    // - display the 3d points using the aniposeviz code
+  }
+}
+
+function show_img_from_buffer_other_view(img_index, panel_id) {
+  console.log(img_index + " " + panel_id);
+  var panel = document.getElementById(panel_id);
+  panel.onclick = function() {
+    _via_show_img(img_index);
+  }
+  // copy the img tag from image_panel into the appropriate camera panel
+  var cimg_html_id = _via_img_buffer_get_html_id(img_index);
+  const current_image = document.getElementById(cimg_html_id);
+  const cloned_image = current_image.cloneNode(true);
+  cloned_image.classList.add("visible");
+  panel.appendChild(cloned_image);
+
+  var wh_ratio = cloned_image.naturalWidth / cloned_image.naturalHeight;
+  const height = 175;
+  const width = height * wh_ratio;
+
+  panel.style.height = height + 'px';
+  panel.style.width = width + 'px';
+
+  // add canvas
+  const canvas = document.createElement('canvas');
+
+  canvas.setAttribute('id', 'subpanel_region_canvas');
+  canvas.height = height;
+  canvas.width = width;
+  panel.appendChild(canvas);
+  // resize canvas to fit
+  // load canvas regions for this canvas
+  const ctx = canvas.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(100, 100, 5, 0, 2*Math.PI, false);
+  ctx.closePath();
+
+  ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
+  ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
+  ctx.stroke();
+
+  ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
+  ctx.globalAlpha = VIA_THEME_SEL_REGION_OPACITY;
+  ctx.fill();
+  ctx.globalAlpha = 1.0;
+  // draw_all_regions in canvas
+}
+
+function show_other_views(other_indices) {
+  // clear the other_views_panel
+  var panel = document.getElementById("other_views_panel");
+  panel.innerHTML = '';
+  // load the images into the appropriate panels
+  for(var index of other_indices) {
+    const img_id = _via_image_id_list[index];
+    const metadata = _via_img_metadata[img_id];
+    const subpanel = document.createElement('div');
+    const subpanel_id = 'image_panel_' + metadata.camera;
+    subpanel.setAttribute('id', subpanel_id);
+    subpanel.classList.add('other_view');
+    panel.appendChild(subpanel);
+
+    if(_via_buffer_img_index_list.includes(index)) {
+      show_img_from_buffer_other_view(index, subpanel_id);
+    } else {
+      _via_img_buffer_add_image(index).then(function(ok_img_index) {
+        show_img_from_buffer_other_view(ok_img_index, subpanel_id);
+      });
+    }
+  }
+}
+
+function find_other_views(img_index) {
+  var img_id = _via_image_id_list[img_index];
+  var img_metadata = _via_img_metadata[img_id];
+  var camera_files = {};
+  for(var i=0; i<_via_image_id_list.length; i++) {
+    var id = _via_image_id_list[i];
+    var meta = _via_img_metadata[id];
+    if(meta.name == img_metadata.name) {
+      camera_files[meta.camera] = i;
+    }
+  }
+  var other_indices = [];
+  for(var camera of calib_params.camera_order) {
+    if((camera != img_metadata.camera) && camera_files[camera]) {
+      other_indices.push(camera_files[camera]);
+    }
+  }
+  return other_indices;
 }
 
 
