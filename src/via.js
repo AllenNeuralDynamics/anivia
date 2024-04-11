@@ -10580,6 +10580,7 @@ function _via_cancel_current_image_loading() {
 }
 
 function _via_show_img(img_index) {
+  // console.log('_via_show_img')
   if ( _via_is_loading_current_image ) {
     return;
   }
@@ -10662,7 +10663,7 @@ function _via_show_img(img_index) {
 }
 
 function show_img_from_buffer_other_view(img_index, panel_id) {
-  console.log(img_index + " " + panel_id);
+  // console.log(img_index + " " + panel_id);
   var panel = document.getElementById(panel_id);
   panel.onclick = function() {
     _via_show_img(img_index);
@@ -10776,7 +10777,7 @@ function _via_show_img_from_buffer(img_index) {
     // _via_buffer_hide_current_image();
     img_fn_list_ith_entry_selected(_via_image_index, false);
     _via_clear_reg_canvas(); // clear old region shapes
-    var old_image = _via_current_image;
+    const old_image = _via_current_image;
 
     var cimg_html_id = _via_img_buffer_get_html_id(img_index);
     _via_current_image = document.getElementById(cimg_html_id);
@@ -10787,7 +10788,7 @@ function _via_show_img_from_buffer(img_index) {
       return;
     }
     _via_current_image.classList.add('visible'); // now show the new image
-    if ( old_image ) { // set up like this to avoid annoying flash
+    if ( old_image && old_image != _via_current_image ) { // set up like this to avoid annoying flash
       setTimeout(function() {
         old_image.classList.remove('visible');
       }, 20);
