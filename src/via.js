@@ -8775,8 +8775,33 @@ function project_file_add_anipose(event) {
     }
   }
 
+
   // load the annotations
-  
+  for ( var i = 0; i < files.length; ++i ) {
+    var path = files[i].webkitRelativePath;
+    var pathList = path.split("/");
+    var depth = pathList.length;
+    var folder = pathList[pathList.length - 2];
+    var name = pathList[pathList.length - 1];
+    var fullpath = "";
+    if(folder) {
+      fullpath = folder + "/";
+    }
+    fullpath = fullpath + name;
+    if(path.slice(path.length-3) == ".h5") {
+      const h5_file = files[i];
+      const formData = new FormData();
+      formData.append('file', h5_file);
+
+      fetch(ANIVIA_H5_CONVERTER_SERVER + '/h5_to_csv', {
+        method: 'POST',
+        body: formData
+      }).then(response => response.text())
+        .then(csvData => {
+          import_annotations_from_lightning_pose_csv(csvData, true);
+        })
+    }
+  }
 
   // promises to load both calib and config files 
   Promise.all([
@@ -10658,12 +10683,13 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
 
   // add canvas
   const canvas = document.createElement('canvas');
-
   canvas.setAttribute('id', 'subpanel_region_canvas');
+  panel.appendChild(canvas);
+
+  // resize canvas to fit
   canvas.height = height;
   canvas.width = width;
-  panel.appendChild(canvas);
-  // resize canvas to fit
+
   // load canvas regions for this canvas
   const ctx = canvas.getContext('2d');
   ctx.beginPath();
