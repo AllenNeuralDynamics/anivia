@@ -227,27 +227,21 @@ textarea {
     height: 150px;
 }
 
-#other_views_panel img {
-    visibility: visible !important;
-    opacity: 1 !important;
-    width: 100%; /* Set a specific width for the images */
-    height: 100%; /* Set a specific height for the images */
-    padding-right: 10px;
-}
-
 .other_view {
     display: inline-block;
     position: relative;
-    width: 100px;
+    margin-right: 10px;
 }
 
 .other_view img {
+    visibility: visible !important;
+    opacity: 1 !important;
     opacity: 0;
     position: absolute;
     top: 0px;
     left: 0px;
-    /* width: 100%; */
-    /* height: 100%; */
+    width: 100%;
+    height: 100%;
     outline: none;
 }
 

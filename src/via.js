@@ -3774,40 +3774,51 @@ function _via_draw_polygon_region(all_points_x, all_points_y, is_selected, shape
   }
 }
 
-function _via_draw_point_region(cx, cy, is_selected) {
+function _via_draw_point_region(cx, cy, is_selected, ctx, r) {
+  if(!r) {
+    r = VIA_REGION_POINT_RADIUS;
+  }
+  if(!ctx) {
+    ctx = _via_reg_ctx;
+  }
+  console.log(cx + " " + cy);
+
   if (is_selected) {
-    _via_draw_point(cx, cy, VIA_REGION_POINT_RADIUS);
+    _via_draw_point(cx, cy, r, ctx);
 
-    _via_reg_ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
-    _via_reg_ctx.stroke();
+    ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
+    ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
+    ctx.stroke();
 
-    _via_reg_ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
-    _via_reg_ctx.globalAlpha = VIA_THEME_SEL_REGION_OPACITY;
-    _via_reg_ctx.fill();
-    _via_reg_ctx.globalAlpha = 1.0;
+    ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
+    ctx.globalAlpha = VIA_THEME_SEL_REGION_OPACITY;
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
   } else {
     // draw a fill line
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH*1.5;
-    _via_draw_point(cx, cy, VIA_REGION_POINT_RADIUS);
-    _via_reg_ctx.stroke();
+    ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH*1.5;
+    _via_draw_point(cx, cy, r, ctx);
+    ctx.stroke();
 
     // draw a boundary line on both sides of the fill line
-    _via_reg_ctx.strokeStyle = VIA_THEME_BOUNDARY_LINE_COLOR;
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
+    ctx.strokeStyle = VIA_THEME_BOUNDARY_LINE_COLOR;
+    ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
     _via_draw_point(cx, cy,
-                    VIA_REGION_POINT_RADIUS - VIA_THEME_REGION_BOUNDARY_WIDTH/2);
-    _via_reg_ctx.stroke();
+                    r - VIA_THEME_REGION_BOUNDARY_WIDTH/2, ctx);
+    ctx.stroke();
     _via_draw_point(cx, cy,
-                    VIA_REGION_POINT_RADIUS + VIA_THEME_REGION_BOUNDARY_WIDTH/2);
-    _via_reg_ctx.stroke();
+                    r + VIA_THEME_REGION_BOUNDARY_WIDTH/2, ctx);
+    ctx.stroke();
   }
 }
 
-function _via_draw_point(cx, cy, r) {
-  _via_reg_ctx.beginPath();
-  _via_reg_ctx.arc(cx, cy, r, 0, 2*Math.PI, false);
-  _via_reg_ctx.closePath();
+function _via_draw_point(cx, cy, r, ctx) {
+  if(!ctx) {
+    ctx = _via_reg_ctx;
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2*Math.PI, false);
+  ctx.closePath();
 }
 
 
@@ -10669,6 +10680,7 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
     _via_show_img(img_index);
   }
   // copy the img tag from image_panel into the appropriate camera panel
+  var img_id = _via_image_id_list[img_index];
   var cimg_html_id = _via_img_buffer_get_html_id(img_index);
   const current_image = document.getElementById(cimg_html_id);
   const cloned_image = current_image.cloneNode(true);
@@ -10678,6 +10690,8 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
   var wh_ratio = cloned_image.naturalWidth / cloned_image.naturalHeight;
   const height = 175;
   const width = height * wh_ratio;
+
+  const scale = height / cloned_image.naturalHeight;
 
   panel.style.height = height + 'px';
   panel.style.width = width + 'px';
@@ -10693,19 +10707,21 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
 
   // load canvas regions for this canvas
   const ctx = canvas.getContext('2d');
-  ctx.beginPath();
-  ctx.arc(100, 100, 5, 0, 2*Math.PI, false);
-  ctx.closePath();
 
-  ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
-  ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
-  ctx.stroke();
+  const regions = _via_img_metadata[img_id].regions;
+  console.log(regions);
 
-  ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
-  ctx.globalAlpha = VIA_THEME_SEL_REGION_OPACITY;
-  ctx.fill();
-  ctx.globalAlpha = 1.0;
-  // draw_all_regions in canvas
+  for(var i=0; i<regions.length; ++i) {
+    let shape = regions[i].shape_attributes;
+    let reg = regions[i].region_attributes;
+    if(shape.name == VIA_REGION_SHAPE.POINT) {
+      // only draw points for now
+      ctx.strokeStyle = "#ffffff";
+      ctx.globalAlpha = 1.0;
+      _via_draw_point_region(shape['cx'] * scale, shape['cy'] * scale, false, ctx, 2);
+    }
+  }
+
 }
 
 function show_other_views(other_indices) {
