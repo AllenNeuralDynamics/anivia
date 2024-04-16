@@ -3535,6 +3535,17 @@ function draw_all_regions() {
       }
     }
 
+    if(_via_img_metadata[_via_image_id].regions[i].computed) {
+      let computed = _via_img_metadata[_via_image_id].regions[i].computed;
+      if(isNaN(computed.error)) {
+        _via_reg_ctx.strokeStyle = "#ffffff";
+      } else if(computed.error < 5) {
+        _via_reg_ctx.strokeStyle = "#00ff00";
+      } else {
+        _via_reg_ctx.strokeStyle = "#ff0000";
+      }
+    }
+
     switch( attr['name'] ) {
     case VIA_REGION_SHAPE.RECT:
       _via_draw_rect_region(attr['x'],
@@ -10594,6 +10605,17 @@ function _via_show_img(img_index) {
     return;
   }
 
+  if ( _anivia_3d_enabled ) {
+    update_reprojection_errors(img_index);
+
+    var other_indices = find_other_views(img_index);
+    show_other_views(other_indices);
+
+    // TODO: code to draw the 3D model
+    // - display the 3d points using the aniposeviz code
+  }
+
+
   var img_id = _via_image_id_list[img_index];
 
   if ( ! _via_img_metadata.hasOwnProperty(img_id) ) {
@@ -10658,18 +10680,7 @@ function _via_show_img(img_index) {
 
   recalculate_anivia_instance_nums(img_id);
 
-  if ( _anivia_3d_enabled ) {
-    // TODO: code to draw the other views
-    // - figure out what the other views are
-    var other_indices = find_other_views(img_index);
-    // - draw the other views in the appropriate image panels
-    show_other_views(other_indices);
 
-    update_reprojection_errors(img_index);
-    // TODO: code to draw the 3D model
-    // - triangulate the 3D points from the 2D points
-    // - display the 3d points using the aniposeviz code
-  }
 }
 
 function show_img_from_buffer_other_view(img_index, panel_id) {
@@ -10712,9 +10723,16 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
   for(var i=0; i<regions.length; ++i) {
     let shape = regions[i].shape_attributes;
     let reg = regions[i].region_attributes;
+    let computed = regions[i].computed;
     if(shape.name == VIA_REGION_SHAPE.POINT) {
       // only draw points for now
-      ctx.strokeStyle = "#ffffff";
+      if(isNaN(computed.error)) {
+        ctx.strokeStyle = "#ffffff";
+      } else if(computed.error < 5) {
+        ctx.strokeStyle = "#00ff00";
+      } else {
+        ctx.strokeStyle = "#ff0000";
+      }
       ctx.globalAlpha = 1.0;
       _via_draw_point_region(shape['cx'] * scale, shape['cy'] * scale, false, ctx, 2);
     }
@@ -10747,7 +10765,6 @@ function show_other_views(other_indices) {
 }
 
 function update_reprojection_errors(img_index) {
-  img_index = _via_image_index;
   var img_indices = find_other_views(img_index, true);
   // get the 2d points across all views
   var camera_names = [];
@@ -10789,6 +10806,7 @@ function update_reprojection_errors(img_index) {
       };
     }
   }
+  console.log('updated reprojections!');
 }
 
 function find_other_views(img_index, include_index) {
