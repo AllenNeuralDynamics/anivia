@@ -3781,7 +3781,6 @@ function _via_draw_point_region(cx, cy, is_selected, ctx, r) {
   if(!ctx) {
     ctx = _via_reg_ctx;
   }
-  console.log(cx + " " + cy);
 
   if (is_selected) {
     _via_draw_point(cx, cy, r, ctx);
@@ -8848,9 +8847,8 @@ function project_file_add_anipose(event) {
 
     // load config params
     calib_params['cam_regex'] = config['triangulation']['cam_regex'];
-    calib_params['offsets'] = {};
     for(var key of Object.keys(config['cameras'])) {
-      calib_params['offsets'][key] = config['cameras'][key]['offset'];
+      calib_params['cameras'][key]['offset'] = config['cameras'][key]['offset'];
     }
   }).catch((error) => {
     console.error('Error loading files:', error);
@@ -10666,7 +10664,8 @@ function _via_show_img(img_index) {
     var other_indices = find_other_views(img_index);
     // - draw the other views in the appropriate image panels
     show_other_views(other_indices);
-    
+
+    update_reprojection_errors(img_index);
     // TODO: code to draw the 3D model
     // - triangulate the 3D points from the 2D points
     // - display the 3d points using the aniposeviz code
@@ -10709,7 +10708,6 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
   const ctx = canvas.getContext('2d');
 
   const regions = _via_img_metadata[img_id].regions;
-  console.log(regions);
 
   for(var i=0; i<regions.length; ++i) {
     let shape = regions[i].shape_attributes;
@@ -10748,7 +10746,52 @@ function show_other_views(other_indices) {
   }
 }
 
-function find_other_views(img_index) {
+function update_reprojection_errors(img_index) {
+  img_index = _via_image_index;
+  var img_indices = find_other_views(img_index, true);
+  // get the 2d points across all views
+  var camera_names = [];
+  var all_points = [];
+  for(var index of img_indices) {
+    var id = _via_image_id_list[index];
+    var meta = _via_img_metadata[id];
+    var pts = [];
+    for(var region of meta.regions) {
+      var shape = region.shape_attributes;
+      let pt = [shape['cx'], shape['cy']];
+      if((pt[0] < 50) && (pt[1] < 50)) {
+        pt = [NaN, NaN];
+      }
+      pts.push(pt);
+    }
+    all_points.push(pts)
+    camera_names.push(meta.camera);
+  }
+  var num_points = all_points[0].length;
+  // var points_3d = [];
+  for(var i=0; i < num_points; i++) {
+    var points = [];
+    for(var cnum=0; cnum < camera_names.length; cnum++) {
+      points.push(all_points[cnum][i]);
+    }
+    // triangulate the points and get projections
+    var p3d = triangulate_points(points, calib_params);
+    var p2d_proj = project_points(p3d, calib_params);
+    // place into data
+    for(var cnum=0; cnum < camera_names.length; cnum++) {
+      let index = img_indices[cnum];
+      var id = _via_image_id_list[index];
+      var meta = _via_img_metadata[id];
+      meta.regions[i].computed = {
+        proj_x: p2d_proj[cnum][0],
+        proj_y: p2d_proj[cnum][1],
+        error: dist_points(p2d_proj[cnum], points[cnum])
+      };
+    }
+  }
+}
+
+function find_other_views(img_index, include_index) {
   var img_id = _via_image_id_list[img_index];
   var img_metadata = _via_img_metadata[img_id];
   var camera_files = {};
@@ -10761,7 +10804,8 @@ function find_other_views(img_index) {
   }
   var other_indices = [];
   for(var camera of calib_params.camera_order) {
-    if((camera != img_metadata.camera) && camera_files[camera]) {
+    if(((camera != img_metadata.camera) || include_index)
+       && camera_files[camera] !== undefined) {
       other_indices.push(camera_files[camera]);
     }
   }

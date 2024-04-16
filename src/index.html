@@ -55,8 +55,13 @@
     <link rel="stylesheet" type="text/css" href="via.css">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.13.0/Sortable.min.js"></script>
+    <!-- need these to load files -->
     <script src="lib/toml.js"></script>
     <script src="lib/yaml.js"></script>
+    <!-- required libraries for triangulation -->
+    <script src="https://unpkg.com/svd-js" type="application/javascript"></script>
+    <script src="https://unpkg.com/mathjs@12.4.1" type="application/javascript"></script>
+    <script src="lib/triangulation.js"></script>
   </head>
 
   <body onload="_via_init()" onresize="_via_update_ui_components()">
