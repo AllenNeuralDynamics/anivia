@@ -130,7 +130,7 @@ function triangulate_points(points, calib_params) {
   for(var i=0; i<calib_params.camera_order.length; i++) {
     let cname = calib_params.camera_order[i];
     let cam = calib_params.cameras[cname];
-    if(isNaN(points[i][0]) || isNaN(points[i][1])) {
+    if((points[i] === undefined) || isNaN(points[i][0]) || isNaN(points[i][1])) {
       continue;
     }
     let pt_und = undistort_points([points[i]], cam)
@@ -174,6 +174,9 @@ function project_points_cam(point, cam) {
 }
 
 function dist_points(p1, p2) {
+  if((p1 == undefined) || (p2 == undefined)) {
+    return NaN;
+  }
   let ex = p1[0] - p2[0];
   let ey = p1[1] - p2[1];
   return Math.sqrt(ex * ex + ey * ey)

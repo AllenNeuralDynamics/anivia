@@ -2826,7 +2826,9 @@ function _via_reg_canvas_mouseup_handler(e) {
             canvas_point_region.shape_attributes['cy'] = Math.round(_via_click_y0);
             _via_canvas_regions.push(canvas_point_region);
 
-
+            if( _anivia_3d_enabled ) {
+              _via_show_img(_via_image_index); // recompute 3d and redisplay
+            }
             annotation_editor_update_content();
             break;
           }
@@ -3423,6 +3425,11 @@ function _via_move_region(region_id, move_x, move_y) {
 
     canvas_attr['cx'] = Math.round( image_attr['cx'] / _via_canvas_scale);
     canvas_attr['cy'] = Math.round( image_attr['cy'] / _via_canvas_scale);
+
+    if( _anivia_3d_enabled ) {
+      _via_show_img(_via_image_index); // recompute 3d and redisplay
+    }
+
     break;
 
   case VIA_REGION_SHAPE.POLYLINE: // handled by polygon
@@ -3455,6 +3462,7 @@ function _via_move_region(region_id, move_x, move_y) {
       canvas_px[i] = Math.round( img_px[i] / _via_canvas_scale );
       canvas_py[i] = Math.round( img_py[i] / _via_canvas_scale );
     }
+
     break;
   }
 }
@@ -3535,15 +3543,13 @@ function draw_all_regions() {
       }
     }
 
-    if(_via_img_metadata[_via_image_id].regions[i].computed) {
+    if(_anivia_3d_enabled) {
       let computed = _via_img_metadata[_via_image_id].regions[i].computed;
-      if(isNaN(computed.error)) {
-        _via_reg_ctx.strokeStyle = "#ffffff";
-      } else if(computed.error < 5) {
-        _via_reg_ctx.strokeStyle = "#00ff00";
-      } else {
-        _via_reg_ctx.strokeStyle = "#ff0000";
+      var error = undefined;
+      if(computed !== undefined) {
+        error = computed.error;
       }
+      _via_reg_ctx.strokeStyle = get_error_color(error);
     }
 
     switch( attr['name'] ) {
@@ -10726,18 +10732,76 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
     let computed = regions[i].computed;
     if(shape.name == VIA_REGION_SHAPE.POINT) {
       // only draw points for now
-      if(isNaN(computed.error)) {
-        ctx.strokeStyle = "#ffffff";
-      } else if(computed.error < 5) {
-        ctx.strokeStyle = "#00ff00";
-      } else {
-        ctx.strokeStyle = "#ff0000";
+      var error = undefined;
+      if(computed !== undefined) {
+        error = computed.error;
       }
+      ctx.strokeStyle = get_error_color(error);
       ctx.globalAlpha = 1.0;
       _via_draw_point_region(shape['cx'] * scale, shape['cy'] * scale, false, ctx, 2);
     }
   }
 
+}
+
+function componentToHex(c) {
+  var hex = Math.round(c).toString(16);
+  return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
+function HSVtoRGB(h, s, v) {
+    var r, g, b, i, f, p, q, t;
+    if (arguments.length === 1) {
+        s = h.s, v = h.v, h = h.h;
+    }
+    i = Math.floor(h * 6);
+    f = h * 6 - i;
+    p = v * (1 - s);
+    q = v * (1 - f * s);
+    t = v * (1 - (1 - f) * s);
+    switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+    return {
+        r: Math.round(r * 255),
+        g: Math.round(g * 255),
+        b: Math.round(b * 255)
+    };
+}
+
+
+function get_error_color(error) {
+  if(isNaN(error)) {
+    return "#ffffff";
+  }
+
+  var low = 2;
+  var high = 15;
+
+  if(error < low) {
+    return "#00ff00";
+  } else if(error > high) {
+    return "#ff0000";
+  } else {
+    var r, g, b;
+    let ratio = (high - error) / (high - low);
+    r = 255 * (1 - ratio);
+    g = 255 * ratio;
+    b = 0;
+
+    let ret = rgbToHex(r, g, b);
+    // console.log(error + " " + ratio + " " +  ret);
+    return ret;
+  }
 }
 
 function show_other_views(other_indices) {
@@ -10769,6 +10833,7 @@ function update_reprojection_errors(img_index) {
   // get the 2d points across all views
   var camera_names = [];
   var all_points = [];
+  var max_length = 0;
   for(var index of img_indices) {
     var id = _via_image_id_list[index];
     var meta = _via_img_metadata[id];
@@ -10782,27 +10847,49 @@ function update_reprojection_errors(img_index) {
       pts.push(pt);
     }
     all_points.push(pts)
+    max_length = Math.max(max_length, pts.length);
     camera_names.push(meta.camera);
   }
-  var num_points = all_points[0].length;
+  var num_points = max_length;
   // var points_3d = [];
   for(var i=0; i < num_points; i++) {
     var points = [];
     for(var cnum=0; cnum < camera_names.length; cnum++) {
-      points.push(all_points[cnum][i]);
+      let pt = all_points[cnum][i];
+      if(pt === undefined) {
+        pt = [NaN, NaN];
+      }
+      points.push(pt);
     }
+
     // triangulate the points and get projections
     var p3d = triangulate_points(points, calib_params);
     var p2d_proj = project_points(p3d, calib_params);
+
+    var sum = 0;
+    var count = 0;
+    for(var cnum=0; cnum < camera_names.length; cnum++) {
+      let d = dist_points(p2d_proj[cnum], points[cnum])
+      if(!isNaN(d)) {
+        sum += d;
+        count += 1;
+      }
+    }
+    var mean_err = sum / count;
+
     // place into data
     for(var cnum=0; cnum < camera_names.length; cnum++) {
       let index = img_indices[cnum];
       var id = _via_image_id_list[index];
       var meta = _via_img_metadata[id];
+      if(meta.regions[i] === undefined) {
+        continue;
+      }
       meta.regions[i].computed = {
         proj_x: p2d_proj[cnum][0],
         proj_y: p2d_proj[cnum][1],
-        error: dist_points(p2d_proj[cnum], points[cnum])
+        error: mean_err
+        // error: dist_points(p2d_proj[cnum], points[cnum])
       };
     }
   }
