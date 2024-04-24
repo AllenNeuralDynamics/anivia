@@ -8804,30 +8804,45 @@ function project_file_add_anipose(event) {
 
 
   // load the annotations
-  for ( var i = 0; i < files.length; ++i ) {
-    var path = files[i].webkitRelativePath;
-    var pathList = path.split("/");
-    var depth = pathList.length;
-    var folder = pathList[pathList.length - 2];
-    var name = pathList[pathList.length - 1];
-    var fullpath = "";
-    if(folder) {
-      fullpath = folder + "/";
-    }
-    fullpath = fullpath + name;
-    if(path.slice(path.length-3) == ".h5") {
-      const h5_file = files[i];
-      const formData = new FormData();
-      formData.append('file', h5_file);
+  // for ( var i = 0; i < files.length; ++i ) {
+  //   var path = files[i].webkitRelativePath;
+  //   var pathList = path.split("/");
+  //   var depth = pathList.length;
+  //   var folder = pathList[pathList.length - 2];
+  //   var name = pathList[pathList.length - 1];
+  //   var fullpath = "";
+  //   if(folder) {
+  //     fullpath = folder + "/";
+  //   }
+  //   fullpath = fullpath + name;
+  //   if(path.slice(path.length-3) == ".h5") {
+  //     const h5_file = files[i];
+  //     const formData = new FormData();
+  //     formData.append('file', h5_file);
 
-      fetch(ANIVIA_H5_CONVERTER_SERVER + '/h5_to_csv', {
-        method: 'POST',
-        body: formData
-      }).then(response => response.text())
-        .then(csvData => {
-          import_annotations_from_lightning_pose_csv(csvData, true);
-        })
+  //     fetch(ANIVIA_H5_CONVERTER_SERVER + '/h5_to_csv', {
+  //       method: 'POST',
+  //       body: formData
+  //     }).then(response => response.text())
+  //       .then(csvData => {
+  //         import_annotations_from_lightning_pose_csv(csvData, true);
+  //       })
+  //   }
+  // }
+
+  var csv_file;
+  for ( var i = 0; i < files.length; ++i ) {
+    if( (files[i].type == 'text/csv') &&
+        (files[i].webkitRelativePath.split("/").length == 2) ) {
+      // top level csv
+      csv_file = files[i];
+      break;
     }
+  }
+  if(csv_file) {
+    load_text_file(csv_file, import_annotations_from_lightning_pose_csv);
+  } else {
+    console.log("missing csv annotation file!");
   }
 
   // promises to load both calib and config files 
