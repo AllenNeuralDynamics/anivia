@@ -8572,10 +8572,11 @@ async function project_file_add_slp(event) {
 }
 
 
-function project_file_add_deeplabcut(event) {
+function project_file_add_deeplabcut(event, is_s3 = false) {
   var files = Array.from(event.target.files);
   files.sort(function(a, b) {
-    return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
+    return is_s3 ? a.s3RelativePath.localeCompare(b.s3RelativePath)
+                : a.webkitRelativePath.localeCompare(b.webkitRelativePath);
   });
   
   // add the images
@@ -8589,7 +8590,7 @@ function project_file_add_deeplabcut(event) {
       var img_index = _via_image_filename_list.indexOf(files[i].name);
        if( img_index === -1) {
         // a new file was added to project
-        var path = files[i].webkitRelativePath;
+        var path = is_s3 ? files[i].s3RelativePath : files[i].webkitRelativePath;
         var pathList = path.split("/");
         var folder = pathList[pathList.length - 2];
         var name = pathList[pathList.length - 1];
@@ -8619,7 +8620,7 @@ function project_file_add_deeplabcut(event) {
   //  find the h5 file
   var h5_file;
   for ( var i = 0; i < files.length; ++i ) {
-    var path = files[i].webkitRelativePath;
+    var path = is_s3 ? files[i].s3RelativePath : files[i].webkitRelativePath;
     if(path.slice(path.length-3) == ".h5") {
       h5_file = files[i];
       break;
@@ -8665,10 +8666,11 @@ function project_file_add_deeplabcut(event) {
 }
 
 
-function project_file_add_lightning_pose(event) {
+function project_file_add_lightning_pose(event, is_s3 = false) {
   var files = Array.from(event.target.files);
   files.sort(function(a, b) {
-    return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
+    return (is_s3) ? a.s3RelativePath.localeCompare(b.s3RelativePath)
+              : a.webkitRelativePath.localeCompare(b.webkitRelativePath);
   });
   
   // add the images
@@ -8682,7 +8684,7 @@ function project_file_add_lightning_pose(event) {
       var img_index = _via_image_filename_list.indexOf(files[i].name);
        if( img_index === -1) {
         // a new file was added to project
-        var path = files[i].webkitRelativePath;
+        var path = is_s3 ? files[i].s3RelativePath : files[i].webkitRelativePath;
         var pathList = path.split("/");
         var folder = pathList[pathList.length - 2];
         var name = pathList[pathList.length - 1];
@@ -8711,9 +8713,11 @@ function project_file_add_lightning_pose(event) {
 
   //  find the csv file
   var csv_file;
+  var csv_file_path;
   for ( var i = 0; i < files.length; ++i ) {
+    csv_file_path = is_s3 ? files[i].s3RelativePath : files[i].webkitRelativePath;
     if( (files[i].type == 'text/csv') &&
-        (files[i].webkitRelativePath.split("/").length == 2) ) {
+        (csv_file_path.split("/").length == 2) ) {
       // top level csv
       csv_file = files[i];
       break;
