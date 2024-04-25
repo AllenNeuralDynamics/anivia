@@ -614,11 +614,14 @@ button.leftsidebar_accordion.active:after {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
-    padding: 6px;
+    margin-bottom: 2px;
+    padding: 2px;
     border: 2px solid #222;
 }
 
+#bodyparts_editor_panel .remove-btn {
+    font-size: 11px;
+}
 
 /*
   Overlay panel used to gather user inputs before invoking a function
