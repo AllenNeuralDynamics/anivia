@@ -606,18 +606,18 @@ button.leftsidebar_accordion.active:after {
 }
 
 #bodyparts_editor_panel ul {
-       padding: 0;
-       list-style: none;
-   }
+    padding: 0;
+    list-style: none;
+}
 
 #bodyparts_editor_panel li {
-       display: flex;
-       align-items: center;
-       justify-content: space-between;
-       margin-bottom: 10px;
-       padding: 6px;
-       border: 2px solid #222;
-   }
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 6px;
+    border: 2px solid #222;
+}
 
 
 /*
