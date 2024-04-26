@@ -18,6 +18,10 @@ body {
     box-sizing: border-box;
 }
 
+.choices__item {
+    color: black;
+}
+
 input[type=text] {
     border: 1px solid #cccccc;
     margin: 0.6rem 0;
@@ -447,11 +451,15 @@ button.leftsidebar_accordion.active:after {
 }
 
 .button_panel .text_button, .text_button {
-    color: #0000ff;
+    color: #0077ff;
     padding: 0.2rem 0.2rem;
     -moz-user-select: none;
     -webkit-user-select: none;
     -ms-user-select: none;
+}
+
+a {
+    color: #0077ff;
 }
 
 .button_panel .flush_right {

@@ -43,21 +43,29 @@
     javascript code below.
     -->
     <script type="text/javascript">
-      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-                               m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-                              })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-      //__ENABLED_BY_PACK_SCRIPT__ga('create', 'UA-20555581-2', 'auto');
-      //__ENABLED_BY_PACK_SCRIPT__ga('set', 'page', 'via-2.0.0.html');
-      //__ENABLED_BY_PACK_SCRIPT__ga('send', 'pageview');
+     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+       (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+                              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+     //__ENABLED_BY_PACK_SCRIPT__ga('create', 'UA-20555581-2', 'auto');
+     //__ENABLED_BY_PACK_SCRIPT__ga('set', 'page', 'via-2.0.0.html');
+     //__ENABLED_BY_PACK_SCRIPT__ga('send', 'pageview');
     </script>
 
-    <link rel="stylesheet" type="text/css" href="via.css">
 
+    <!-- sortable library for sorting points -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.13.0/Sortable.min.js"></script>
+    <!-- library to select dropdown -->
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@9.0.1/public/assets/styles/base.min.css" /> -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@9.0.1/public/assets/styles/choices.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/choices.js@9.0.1/public/assets/scripts/choices.min.js"></script>
+    
     <!-- need these to load files -->
     <script src="lib/toml.js"></script>
     <script src="lib/yaml.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="via.css">
+
     <!-- required libraries for triangulation -->
     <script src="https://unpkg.com/svd-js" type="application/javascript"></script>
     <script src="https://unpkg.com/mathjs@12.4.1" type="application/javascript"></script>
@@ -206,13 +214,7 @@
       <div class="content">
         <p class="title">Bodyparts editor</p>
         <div class="bodyparts_confirm">
-          <button id="bodyparts_add_part"
-                  onclick="add_bodypart()">
-            Add bodypart
-          </button>
 
-          &nbsp;
-          
           <button id="bodyparts_import_button"
                   onclick="bodyparts_import()">
             Import
@@ -233,8 +235,38 @@
           </button>
         </div>
 
-        <ul id="bodypart_list">
-        </ul>
+        <br/>
+
+        <div class="bodyparts_lines">
+          <h4>Lines</h4>
+          <div id="bodyparts_lines_simple">
+            <button id="bodyparts_add_lines"
+                    onclick="start_editing_line()">
+              Add new line
+            </button>
+          </div>
+          <div id="bodyparts_lines_editor">
+            <button id="bodyparts_lines_finish"
+                    onclick="finish_editing_line()">
+              Finish editing line
+            </button>
+            <div id="lines_selector_holder"></div>
+          </div>
+          <ul id="bodypart_line_list">
+          </ul>
+        </div>
+
+        <br/>
+
+        <div class="bodyparts_points">
+          <h4>Bodyparts</h4>
+          <button id="bodyparts_add_part"
+                  onclick="add_bodypart()">
+            Add bodypart
+          </button>
+          <ul id="bodypart_point_list">
+          </ul>
+        </div>
 
       </div>
     </div>

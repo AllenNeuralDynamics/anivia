@@ -317,6 +317,7 @@ var VIA_COCO_EXPORT_ATTRIBUTE_TYPE = [VIA_ATTRIBUTE_TYPE.DROPDOWN,
 
 // Variables for animal annotation
 var _anivia_bodyparts = []; // list of bodyparts within each animal
+var _anivia_lines = []; // list of lines connecting bodyparts for ease
 var _anivia_instance_id = 0; // current instance id
 var _anivia_num_instances = 0; // number of instances, updated by image
 
@@ -7077,22 +7078,92 @@ function hide_bodyparts_editor_panel() {
 }
 
 
-var bodypart_list = document.getElementById("bodypart_list");
+var bodypart_point_list = document.getElementById("bodypart_point_list");
+var bodypart_line_list = document.getElementById("bodypart_line_list");
 
 function create_bodyparts_editor_panel(bodyparts) {
   if(!bodyparts) {
     bodyparts = _anivia_bodyparts;
   }
-  bodypart_list.innerHTML = '';
+  bodypart_point_list.innerHTML = '';
   for(var i=0; i<bodyparts.length; i++) {
     add_bodypart(bodyparts[i]);
   }
+
+  bodypart_line_list.innerHTML = '';
+  for(var i=0; i<_anivia_lines.length; i++) {
+    add_line(_anivia_lines[i].toString());
+  }
+
+  hide_lines_editor();
+
   show_bodyparts_editor_panel();
+}
+
+function hide_lines_editor() {
+  document.getElementById("bodyparts_lines_simple").style.display = 'block';
+  document.getElementById("bodyparts_lines_editor").style.display = 'none';
+}
+
+function show_lines_editor() {
+  document.getElementById("bodyparts_lines_simple").style.display = 'none';
+  document.getElementById("bodyparts_lines_editor").style.display = 'block';
+}
+
+function start_editing_line() {
+  // show selector with list
+  const selector_holder = document.getElementById("lines_selector_holder");
+
+  selector_holder.innerHTML = '<select multiple id="lines_selector"></select>';
+
+  const selector = document.getElementById('lines_selector');
+  const bodyparts = _anivia_bodyparts;
+
+  let possible = [];
+  for(var bp of bodyparts) {
+    possible.push({
+      value: bp,
+      label: bp,
+      selected: false,
+      disabled: false
+    })
+  }
+  
+  const choices = new Choices(selector, {
+       choices: possible,
+       removeItems: true,
+       removeItemButton: true,
+   });
+
+  show_lines_editor()
+}
+
+function finish_editing_line() {
+  const options = document.getElementById("lines_selector").selectedOptions;
+  var items = [];
+  for(var i=0; i<options.length; i++) {
+    items.push(options[i].value);
+  }
+  const line = items.toString();
+  add_line(line);
+  hide_lines_editor();
+}
+
+function add_line(line_str) {
+  var item = document.createElement("li");
+  item.innerHTML = '<span>' + line_str + '</span>' +
+    '<button onclick="remove_line(event)" class="remove-btn">Remove</button>';
+  bodypart_line_list.appendChild(item);
 }
 
 function remove_bodypart(event) {
   var item = event.target.parentNode;
-  bodypart_list.removeChild(item);
+  bodypart_point_list.removeChild(item);
+}
+
+function remove_line(event) {
+  var item = event.target.parentNode;
+  bodypart_line_list.removeChild(item);
 }
 
 function add_bodypart(item_name) {
@@ -7103,12 +7174,12 @@ function add_bodypart(item_name) {
     var item = document.createElement("li");
     item.innerHTML = '<span>' + item_name + '</span>' +
       '<button onclick="remove_bodypart(event)" class="remove-btn">Remove</button>';
-    bodypart_list.appendChild(item);
+    bodypart_point_list.appendChild(item);
   }
 }
 
 function bodyparts_update_from_li() {
-  var lis = bodypart_list.getElementsByTagName('li');
+  var lis = bodypart_point_list.getElementsByTagName('li');
   var bodyparts = [];
 
   for (var i = 0; i < lis.length; i++) {
@@ -7121,8 +7192,23 @@ function bodyparts_update_from_li() {
   return bodyparts;
 }
 
+function lines_update_from_li() {
+  var lis = bodypart_line_list.getElementsByTagName('li');
+  var lines = [];
+
+  for (var i = 0; i < lis.length; i++) {
+    var span = lis[i].getElementsByTagName('span')[0];
+    var item = span.textContent;
+    lines.push(item.split(","))
+  }
+  console.log(lines);
+  _anivia_lines = lines;
+  return lines;
+}
+
 function bodyparts_save_edit() {
   bodyparts_update_from_li();
+  lines_update_from_li();
   hide_bodyparts_editor_panel()
 }
   
@@ -7177,7 +7263,7 @@ function bodyparts_export() {
 
                    
 // Reorder functionality
-Sortable.create(bodypart_list, {
+Sortable.create(bodypart_point_list, {
   animation: 150,
   onStart: function(event) {
     event.item.style.cursor = "move";
