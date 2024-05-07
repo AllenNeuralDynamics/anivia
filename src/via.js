@@ -718,7 +718,7 @@ function import_annotations_from_deeplabcut_csv(data) {
   import_annotations_from_lightning_pose_csv(data, true);
 }
 
-function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
+function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, trim_camera) {
   return new Promise( function(ok_callback, err_callback) {
     if ( data === '' || typeof(data) === 'undefined') {
       err_callback();
@@ -772,6 +772,15 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
       if(trim_labeled_data) {
         filename = filename.replace("labeled-data/", "");
       }
+      if(trim_camera) {
+        let fileList = filename.split("/");
+        let folder = fileList[fileList.length - 2];
+        let name = fileList[fileList.length - 1];
+        let folderList = folder.split("--");
+        let camera = folderList[folderList.length - 1];
+        filename = camera + "/" + name;
+      }
+
       var img_id   = _via_get_image_id(filename, -1);
 
       // check if file is already present in this project
@@ -3594,6 +3603,11 @@ function draw_all_regions() {
       break;
     }
   }
+  draw_connecting_lines();
+}
+
+function draw_connecting_lines() {
+  // function to draw lines connecting points
 }
 
 // control point for resize of region boundaries
@@ -8831,14 +8845,17 @@ function project_file_add_anipose(event) {
         var pathList = path.split("/");
         var folder = pathList[pathList.length - 2];
         var name = pathList[pathList.length - 1];
+        var folderList = folder.split("--");
+        var camera = folderList[folderList.length - 1];
         var fullpath = "";
-        if(folder) {
-          fullpath = folder + "/";
+        if(camera) {
+          fullpath = camera + "/";
         }
         fullpath = fullpath + name;
 
         var new_img_id = project_add_new_file(fullpath);
-        _via_img_metadata[new_img_id].camera = folder;
+        _via_img_metadata[new_img_id].camera = camera;
+        _via_img_metadata[new_img_id].folder = folder;
         _via_img_metadata[new_img_id].name = name;
         _via_img_fileref[new_img_id] = files[i];
         set_file_annotations_to_default_value(new_img_id);
@@ -8926,7 +8943,9 @@ function project_file_add_anipose(event) {
     }
   }
   if(csv_file) {
-    load_text_file(csv_file, import_annotations_from_lightning_pose_csv);
+    load_text_file(csv_file, function(fname) {
+      import_annotations_from_lightning_pose_csv(fname, false, true)
+    });
   } else {
     console.log("missing csv annotation file!");
   }
@@ -8964,9 +8983,13 @@ function project_file_add_anipose(event) {
     }
 
     // load config params
-    calib_params['cam_regex'] = config['triangulation']['cam_regex'];
-    for(var key of Object.keys(config['cameras'])) {
-      calib_params['cameras'][key]['offset'] = config['cameras'][key]['offset'];
+    // calib_params['cam_regex'] = config['triangulation']['cam_regex'];
+    for(var key of Object.keys(calib_params['cameras'])) {
+      try {
+        calib_params['cameras'][key]['offset'] = config['cameras'][key]['offset'];
+      } catch {
+        calib_params['cameras'][key]['offset'] = [0, 0];
+      }
     }
   }).catch((error) => {
     console.error('Error loading files:', error);
