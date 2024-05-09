@@ -481,7 +481,7 @@ a {
 .button_panel .button {
     display: inline-block;
     padding: 0.35rem 0.5rem;
-    margin: 0 0.05rem;
+    margin: 0.05rem 0.05rem;
     cursor: pointer;
     background-color: #cccccc;
     color: black;

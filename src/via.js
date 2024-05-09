@@ -321,6 +321,8 @@ var _anivia_lines = []; // list of lines connecting bodyparts for ease
 var _anivia_instance_id = 0; // current instance id
 var _anivia_num_instances = 0; // number of instances, updated by image
 
+var _anivia_current_proj = {};
+
 var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
 
 // Variables for 3D annotation
@@ -546,12 +548,15 @@ function toggle_3d_annotation() {
   // TODO: more things presumably to enable the multiple views
   const other_views_panel = document.getElementById("other_views_panel");
   const model_panel = document.getElementById("3d_model_panel");
+  const project_missing_button = document.getElementById("project_missing_button");
   if(_anivia_3d_enabled) {
     other_views_panel.classList.remove('display_none');
     model_panel.classList.remove('display_none');
+    project_missing_button.classList.remove('display_none');
   } else {
     other_views_panel.classList.add('display_none');
     model_panel.classList.add('display_none');
+    project_missing_button.classList.add('display_none');
   }
 
   _via_show_img(_via_image_index);
@@ -4965,6 +4970,10 @@ function del_sel_regions() {
   annotation_editor_show();
 
   show_message('Deleted ' + del_region_count + ' selected regions');
+
+  if( _anivia_3d_enabled ) {
+    _via_show_img(_via_image_index); // recompute 3d and redisplay
+  }
 }
 
 function sel_all_regions() {
@@ -10958,15 +10967,33 @@ function update_reprojection_errors(img_index) {
   var camera_names = [];
   var all_points = [];
   var max_length = 0;
+  var point_indexes = {};
   for(var index of img_indices) {
     var id = _via_image_id_list[index];
     var meta = _via_img_metadata[id];
+    let cam = meta.camera;
+    point_indexes[cam] = {};
+
+    for(var i=0; i<meta.regions.length; i++) {
+      let region = meta.regions[i];
+      let name = region.region_attributes.name;
+      point_indexes[cam][name] = i;
+    }
+    
     var pts = [];
-    for(var region of meta.regions) {
-      var shape = region.shape_attributes;
-      let pt = [shape['cx'], shape['cy']];
-      if((pt[0] < 50) && (pt[1] < 50)) {
-        pt = [NaN, NaN];
+    for(var name of _anivia_bodyparts) {
+      let ix = point_indexes[cam][name];
+      let pt;
+      if(ix === undefined) {
+        // region not present
+        pt = [NaN, NaN]
+      } else {
+        let region = meta.regions[ix];
+        var shape = region.shape_attributes;
+        pt = [shape['cx'], shape['cy']];
+        if((pt[0] < 50) && (pt[1] < 50)) {
+          pt = [NaN, NaN];
+        }
       }
       pts.push(pt);
     }
@@ -10974,15 +11001,15 @@ function update_reprojection_errors(img_index) {
     max_length = Math.max(max_length, pts.length);
     camera_names.push(meta.camera);
   }
+
+  _anivia_current_proj = {};
   var num_points = max_length;
   // var points_3d = [];
   for(var i=0; i < num_points; i++) {
+    let name = _anivia_bodyparts[i];
     var points = [];
     for(var cnum=0; cnum < camera_names.length; cnum++) {
       let pt = all_points[cnum][i];
-      if(pt === undefined) {
-        pt = [NaN, NaN];
-      }
       points.push(pt);
     }
 
@@ -11006,19 +11033,64 @@ function update_reprojection_errors(img_index) {
       let index = img_indices[cnum];
       var id = _via_image_id_list[index];
       var meta = _via_img_metadata[id];
-      if(meta.regions[i] === undefined) {
-        continue;
+      let cam = meta.camera;
+      let ix = point_indexes[cam][name];
+      if(ix !== undefined) {
+        meta.regions[ix].computed = {
+          proj_x: p2d_proj[cnum][0],
+          proj_y: p2d_proj[cnum][1],
+          error: mean_err
+        };
       }
-      meta.regions[i].computed = {
-        proj_x: p2d_proj[cnum][0],
-        proj_y: p2d_proj[cnum][1],
-        error: mean_err
-        // error: dist_points(p2d_proj[cnum], points[cnum])
-      };
+
+      if(_anivia_current_proj[cam] === undefined) {
+        _anivia_current_proj[cam] = {};
+      }
+      _anivia_current_proj[cam][name] = p2d_proj[cnum];
     }
   }
   console.log('updated reprojections!');
 }
+
+function project_missing_points() {
+  var meta = _via_img_metadata[_via_image_id];
+  let cam = meta.camera;
+  var point_indexes = {};
+  for(var i=0; i<meta.regions.length; i++) {
+      let region = meta.regions[i];
+      let name = region.region_attributes.name;
+      point_indexes[name] = i;
+  }
+
+  // identify missing
+  let missing = [];
+  for(var name of _anivia_bodyparts) {
+    if(point_indexes[name] === undefined) {
+      missing.push(name);
+    }
+  }
+
+  for(var name of missing) {
+    let p2d = _anivia_current_proj[cam][name];
+    if((p2d !== undefined) && !isNaN(p2d[0])) {
+      // add a new region
+      var point_region = new file_region();
+      point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
+      point_region.shape_attributes['cx'] = Math.round(p2d[0]);
+      point_region.shape_attributes['cy'] = Math.round(p2d[1]);
+      point_region.region_attributes['name'] = name;
+      point_region.region_attributes['instance_id'] = _anivia_instance_id + "";
+      var region_count = _via_img_metadata[_via_image_id].regions.push(point_region);
+      var new_region_id = region_count - 1;
+      set_region_annotations_to_default_value( new_region_id );
+    }
+  }
+
+  if( _anivia_3d_enabled ) {
+    _via_show_img(_via_image_index); // recompute 3d and redisplay
+  }
+}
+
 
 function find_other_views(img_index, include_index) {
   var img_id = _via_image_id_list[img_index];
