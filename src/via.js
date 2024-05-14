@@ -11220,7 +11220,7 @@ function _via_show_img_from_buffer(img_index) {
 
     // update img_fn_list
     img_fn_list_ith_entry_selected(_via_image_index, true);
-    img_fn_list_scroll_to_current_file();
+    // img_fn_list_scroll_to_current_file();
 
     // refresh the annotations panel
     annotation_editor_update_content();
