@@ -98,8 +98,8 @@ var VIA_REGION_COLOR_LIST = ["#E69F00", "#56B4E9", "#009E73", "#D55E00", "#CC79A
 // radius of control points in all shapes
 var VIA_REGION_SHAPES_POINTS_RADIUS = 3;
 // radius of control points in a point
-var VIA_REGION_POINT_RADIUS         = 3;
-var VIA_REGION_POINT_RADIUS_DEFAULT = 3;
+var VIA_REGION_POINT_RADIUS         = 4;
+var VIA_REGION_POINT_RADIUS_DEFAULT = 4;
 
 var VIA_THEME_REGION_BOUNDARY_WIDTH = 3;
 var VIA_THEME_BOUNDARY_LINE_COLOR   = "black";
@@ -4802,6 +4802,15 @@ function _via_reg_canvas_keydown_handler(e) {
       return;
     }
 
+    if ( e.key === 'm' ) {
+      if ( _via_is_region_selected ||
+           _via_is_all_region_selected ) {
+        mark_missing_sel_regions();
+      }
+      e.preventDefault();
+      return;
+    }
+
     
     if ( _via_is_region_selected ) {
       if ( e.key === 'ArrowRight' ||
@@ -4917,6 +4926,20 @@ function _via_polyshape_add_new_polyshape(img_id, region_shape, region_id) {
     _via_canvas_regions[region_id].shape_attributes['all_points_x'] = canvas_all_points_x;
     _via_canvas_regions[region_id].shape_attributes['all_points_y'] = canvas_all_points_y;
   }
+}
+
+function mark_missing_sel_regions() {
+  let regions = _via_img_metadata[_via_image_id].regions;
+  for ( var i = 0; i < _via_canvas_regions.length; ++i ) {
+    if( _via_region_selected_flag[i] ) {
+      regions[i].shape_attributes.cx = Math.random() * 38 + 10;
+      regions[i].shape_attributes.cy = Math.random() * 38 + 10;
+      _via_region_selected_flag[i] = false;
+    }
+  }
+
+  // redisplay
+  _via_show_img(_via_image_index);
 }
 
 function del_sel_regions() {
@@ -5367,11 +5390,12 @@ function set_zoom(zoom_level_index) {
 
   if ( zoom_scale === 1 ) {
     VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT;
-  } else {
-    if ( zoom_scale > 1 ) {
-      VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT * zoom_scale;
-    }
   }
+  // else {
+  //   if ( zoom_scale > 1 ) {
+  //     VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT * zoom_scale;
+  //   }
+  // }
 
   _via_load_canvas_regions(); // image to canvas space transform
   _via_redraw_reg_canvas();
