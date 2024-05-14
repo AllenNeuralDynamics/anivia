@@ -638,6 +638,9 @@ function download_all_region_data(type, file_extension) {
     if ( file_extension !== 'csv' || file_extension !== 'json' ) { // always true?
       filename += '_' + type + '.' + file_extension;
     }
+    if(type == "lp") {
+      filename = "CollectedData.csv";
+    }
     save_data_to_local_file(all_region_data_blob, filename);
   }.bind(this), function(err) {
     show_message('Failed to download data: [' + err + ']');
@@ -1556,6 +1559,9 @@ async function export_project_to_lightning_pose(add_labeled_data) {
     var metadata = _via_img_metadata[img_id]
     console.log(metadata);
     var filename = metadata.filename;
+    if(metadata.realpath) {
+      filename = metadata.realpath;
+    }
     if(add_labeled_data) {
       filename = "labeled-data/" + filename;
     }
@@ -1654,6 +1660,9 @@ async function export_project_to_slp_format(should_add_images) {
   for( var img_id of _via_image_id_list ) {
     var metadata = _via_img_metadata[img_id]
     var filename = metadata.filename;
+    if(metadata.realpath) {
+      filename = metadata.realpath;
+    }
     var fsplit = filename.split("/");
     var vidnum = parseInt(fsplit[0].replace("video", ""));
     var framenum = parseInt(fsplit[1]);
@@ -8872,7 +8881,7 @@ function project_file_add_anipose(event) {
     if ( filetype === 'image' ) {
       // check which filename in project matches the user selected file
       var img_index = _via_image_filename_list.indexOf(files[i].name);
-       if( img_index === -1) {
+      if( img_index === -1) {
         // a new file was added to project
         var path = files[i].webkitRelativePath;
         var pathList = path.split("/");
@@ -8885,11 +8894,17 @@ function project_file_add_anipose(event) {
           fullpath = camera + "/";
         }
         fullpath = fullpath + name;
+        var realpath = "";
+        if(folder) {
+          realpath = folder + "/";
+        }
+        realpath = realpath + name;
 
-        var new_img_id = project_add_new_file(fullpath);
+          var new_img_id = project_add_new_file(fullpath);
         _via_img_metadata[new_img_id].camera = camera;
         _via_img_metadata[new_img_id].folder = folder;
         _via_img_metadata[new_img_id].name = name;
+        _via_img_metadata[new_img_id].realpath = realpath;
         _via_img_fileref[new_img_id] = files[i];
         set_file_annotations_to_default_value(new_img_id);
         new_img_index_list.push( _via_image_id_list.indexOf(new_img_id) );
