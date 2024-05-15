@@ -10867,52 +10867,64 @@ function show_img_from_buffer_other_view(img_index, panel_id) {
   panel.onclick = function() {
     _via_show_img(img_index);
   }
+
   // copy the img tag from image_panel into the appropriate camera panel
   var img_id = _via_image_id_list[img_index];
   var cimg_html_id = _via_img_buffer_get_html_id(img_index);
-  const current_image = document.getElementById(cimg_html_id);
-  const cloned_image = current_image.cloneNode(true);
+  let cloned_image;
+  if ( _via_img_fileref[img_id] instanceof File ) {
+    let tmp_file_object_url = URL.createObjectURL(_via_img_fileref[img_id]);
+    cloned_image = document.createElement('img');
+    cloned_image.setAttribute('id',  cimg_html_id + "new");
+    cloned_image.setAttribute('src', tmp_file_object_url);
+    cloned_image.setAttribute('alt', 'Image loaded from base64 data of a local file selected by user.');
+  } else {
+    const current_image = document.getElementById(cimg_html_id);
+    cloned_image = current_image.cloneNode(true);
+  }
   cloned_image.classList.add("visible");
   panel.appendChild(cloned_image);
-
-  var wh_ratio = cloned_image.naturalWidth / cloned_image.naturalHeight;
-  const height = 175;
-  const width = height * wh_ratio;
-
-  const scale = height / cloned_image.naturalHeight;
-
-  panel.style.height = height + 'px';
-  panel.style.width = width + 'px';
 
   // add canvas
   const canvas = document.createElement('canvas');
   canvas.setAttribute('id', 'subpanel_region_canvas');
   panel.appendChild(canvas);
 
-  // resize canvas to fit
-  canvas.height = height;
-  canvas.width = width;
+  cloned_image.addEventListener('load', function() {
+    var wh_ratio = cloned_image.naturalWidth / cloned_image.naturalHeight;
+    const height = 175;
+    const width = height * wh_ratio;
 
-  // load canvas regions for this canvas
-  const ctx = canvas.getContext('2d');
+    const scale = height / cloned_image.naturalHeight;
 
-  const regions = _via_img_metadata[img_id].regions;
+    panel.style.height = height + 'px';
+    panel.style.width = width + 'px';
 
-  for(var i=0; i<regions.length; ++i) {
-    let shape = regions[i].shape_attributes;
-    let reg = regions[i].region_attributes;
-    let computed = regions[i].computed;
-    if(shape.name == VIA_REGION_SHAPE.POINT) {
-      // only draw points for now
-      var error = undefined;
-      if(computed !== undefined) {
-        error = computed.error;
+    // resize canvas to fit
+    canvas.height = height;
+    canvas.width = width;
+
+    // load canvas regions for this canvas
+    const ctx = canvas.getContext('2d');
+
+    const regions = _via_img_metadata[img_id].regions;
+
+    for(var i=0; i<regions.length; ++i) {
+      let shape = regions[i].shape_attributes;
+      let reg = regions[i].region_attributes;
+      let computed = regions[i].computed;
+      if(shape.name == VIA_REGION_SHAPE.POINT) {
+        // only draw points for now
+        var error = undefined;
+        if(computed !== undefined) {
+          error = computed.error;
+        }
+        ctx.strokeStyle = get_error_color(error);
+        ctx.globalAlpha = 1.0;
+        _via_draw_point_region(shape['cx'] * scale, shape['cy'] * scale, false, ctx, 2);
       }
-      ctx.strokeStyle = get_error_color(error);
-      ctx.globalAlpha = 1.0;
-      _via_draw_point_region(shape['cx'] * scale, shape['cy'] * scale, false, ctx, 2);
     }
-  }
+  });
 
 }
 
@@ -10990,13 +11002,15 @@ function show_other_views(other_indices) {
     subpanel.classList.add('other_view');
     panel.appendChild(subpanel);
 
-    if(_via_buffer_img_index_list.includes(index)) {
-      show_img_from_buffer_other_view(index, subpanel_id);
-    } else {
-      _via_img_buffer_add_image(index).then(function(ok_img_index) {
-        show_img_from_buffer_other_view(ok_img_index, subpanel_id);
-      });
-    }
+    show_img_from_buffer_other_view(index, subpanel_id);
+
+    // if(_via_buffer_img_index_list.includes(index)) {
+    //   show_img_from_buffer_other_view(index, subpanel_id);
+    // } else {
+    //   _via_img_buffer_add_image(index).then(function(ok_img_index) {
+    //     show_img_from_buffer_other_view(ok_img_index, subpanel_id);
+    //   });
+    // }
   }
 }
 
