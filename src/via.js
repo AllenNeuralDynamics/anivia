@@ -545,7 +545,7 @@ function show_image_grid_view() {
 function toggle_3d_annotation() {
   // this will enable the 3d annotation viewer
   _anivia_3d_enabled = !_anivia_3d_enabled;
-  // TODO: more things presumably to enable the multiple views
+
   const other_views_panel = document.getElementById("other_views_panel");
   const model_panel = document.getElementById("3d_model_panel");
   const project_missing_button = document.getElementById("project_missing_button");
@@ -8738,8 +8738,7 @@ async function project_file_add_slp(event) {
           if(visible) {
             region_i.shape_attributes = {"name": "point", "cx": point[0], "cy": point[1]};
           } else {
-            // TODO: make the x y missing values distinct
-            region_i.shape_attributes = {"name": "point", "cx": 10, "cy": 10};
+            region_i.shape_attributes = {"name": "point", "cx": Math.random()*35 + 10, "cy": Math.random*35 + 10};
           }
           // name for label, instance_id for group color
           region_i.region_attributes = {"name": bodyparts[point_id - start],
