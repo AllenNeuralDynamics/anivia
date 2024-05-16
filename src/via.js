@@ -738,14 +738,15 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, tri
     var malformed_csv_lines_count = 0;
     var file_added_count = 0;
 
-    var line_split_regex = new RegExp('\n|\r|\r\n', 'g');
+    var line_split_regex = new RegExp('[\n\r]+', 'g');
     var csvdata = data.split(line_split_regex);
 
     // parse the header
     var scorer_row = parse_csv_line(csvdata[0])
     var bodypart_row = parse_csv_line(csvdata[1]);
     var coords_row = parse_csv_line(csvdata[2]);
-    
+
+
     if ( (scorer_row[0] != 'scorer' ||
            bodypart_row[0] != 'bodyparts' ||
            coords_row[0] != 'coords')  ||
