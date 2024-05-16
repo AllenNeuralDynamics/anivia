@@ -8983,8 +8983,11 @@ function project_file_add_anipose(event) {
 
   var csv_file;
   for ( var i = 0; i < files.length; ++i ) {
+    let pathList = files[i].webkitRelativePath.split("/");
+    let name = pathList[pathList.length - 1];
     if( (files[i].type == 'text/csv') &&
-        (files[i].webkitRelativePath.split("/").length == 2) ) {
+        (pathList.length == 2) &&
+        (name == 'CollectedData.csv') ) {
       // top level csv
       csv_file = files[i];
       break;
