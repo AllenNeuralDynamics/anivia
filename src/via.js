@@ -828,7 +828,8 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, tri
         // coordinates
         if(isNaN(x) || isNaN(y)) {
           // TODO: better handling of missing points
-          region_i.shape_attributes = {cx: Math.random()*35 + 10, cy: Math.random()*35 + 10, name: "point"};
+          // region_i.shape_attributes = {cx: Math.random()*35 + 10, cy: Math.random()*35 + 10, name: "point"};
+          continue; // don't import missing regions
         } else {
           region_i.shape_attributes = {cx: x, cy: y, name: "point"};
         }
