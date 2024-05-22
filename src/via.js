@@ -5391,6 +5391,16 @@ function set_zoom(zoom_level_index) {
     _via_canvas_zoom_level_index = zoom_level_index;
   }
 
+  var the_x = _via_current_x;
+  var the_y = _via_current_y;
+
+  // save relative cursor location in image
+  var rel_cursor_x = the_x/_via_reg_canvas.width;
+  var rel_cursor_y = the_y/_via_reg_canvas.height;
+  
+  // center image around cursor, if cursor was in image
+  // use window.scroll
+
   var zoom_scale = VIA_CANVAS_ZOOM_LEVELS[_via_canvas_zoom_level_index];
   set_all_canvas_scale(zoom_scale);
   var canvas_w = ( _via_current_image.naturalWidth  * zoom_scale ) / _via_canvas_scale_without_zoom;
@@ -5407,6 +5417,13 @@ function set_zoom(zoom_level_index) {
   //     VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT * zoom_scale;
   //   }
   // }
+
+  // move to adjust zoom
+  var new_rel_cursor_x = the_x/_via_reg_canvas.width;
+  var new_rel_cursor_y = the_y/_via_reg_canvas.height;
+  var diff_x = (rel_cursor_x - new_rel_cursor_x) * _via_reg_canvas.width;
+  var diff_y = (rel_cursor_y - new_rel_cursor_y) * _via_reg_canvas.height;
+  window.scrollBy(diff_x, diff_y); 
 
   _via_load_canvas_regions(); // image to canvas space transform
   _via_redraw_reg_canvas();
