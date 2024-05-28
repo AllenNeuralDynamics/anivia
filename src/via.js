@@ -93,7 +93,7 @@ var VIA_ELLIPSE_EDGE_TOL          = 0.2; // euclidean distance
 var VIA_THETA_TOL                 = Math.PI/18; // 10 degrees
 var VIA_POLYGON_RESIZE_VERTEX_OFFSET  = 100;
 var VIA_CANVAS_DEFAULT_ZOOM_LEVEL_INDEX = 3;
-var VIA_CANVAS_ZOOM_LEVELS = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4, 5, 6, 7, 8, 9, 10];
+var VIA_CANVAS_ZOOM_LEVELS = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4, 5, 6, 7, 8, 10, 12, 15, 20];
 var VIA_REGION_COLOR_LIST = ["#E69F00", "#56B4E9", "#009E73", "#D55E00", "#CC79A7", "#F0E442", "#ffffff"];
 // radius of control points in all shapes
 var VIA_REGION_SHAPES_POINTS_RADIUS = 3;
