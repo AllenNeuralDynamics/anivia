@@ -817,7 +817,7 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, tri
         if(!points_row[bp]) {
           points_row[bp] = {}
         }
-        points_row[bp][coord] = parseFloat(d[col]);
+        points_row[bp][coord] = d[col];
       }
 
       for(var bp of bodyparts) {
@@ -826,10 +826,12 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, tri
 
         var region_i = new file_region();
         // coordinates
-        if(isNaN(x) || isNaN(y)) {
-          // TODO: better handling of missing points
-          // region_i.shape_attributes = {cx: Math.random()*35 + 10, cy: Math.random()*35 + 10, name: "point"};
-          continue; // don't import missing regions
+        console.log(points_row[bp]['x']);
+        if((points_row[bp]['x'] == "") || (points_row[bp]['y'] == "")) {
+          continue; // don't import missing region
+        } else if(isNaN(x) || isNaN(y)) {
+          // place in explicitly missing corner
+          region_i.shape_attributes = {cx: Math.random()*35 + 10, cy: Math.random()*35 + 10, name: "point"};
         } else {
           region_i.shape_attributes = {cx: x, cy: y, name: "point"};
         }
@@ -1598,9 +1600,12 @@ async function export_project_to_lightning_pose(add_labeled_data) {
       for (var coord of "xy") {
         var val;
         if(points_dict[instance_id] &&
-           points_dict[instance_id][bp] &&
-           points_dict[instance_id][bp]['visible']) {
-          val = points_dict[instance_id][bp][coord];
+           points_dict[instance_id][bp]) {
+          if(points_dict[instance_id][bp]['visible']) {
+            val = points_dict[instance_id][bp][coord];
+          } else {
+            val = "NaN";
+          }
         } else {
           val = "";
         }
