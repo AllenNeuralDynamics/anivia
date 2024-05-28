@@ -11150,7 +11150,12 @@ function project_missing_points() {
 
   for(var name of missing) {
     let p2d = _anivia_current_proj[cam][name];
-    if((p2d !== undefined) && !isNaN(p2d[0])) {
+    if( // must be valid
+       (p2d !== undefined) && !isNaN(p2d[0]) &&
+        // don't project close to border
+       (p2d[0] > 20) && (p2d[0] < _via_current_image.naturalWidth - 20) &&
+       (p2d[1] > 20) && (p2d[1] < _via_current_image.naturalHeight - 20)) {
+
       // add a new region
       var point_region = new file_region();
       point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
