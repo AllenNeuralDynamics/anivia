@@ -45,20 +45,33 @@
     javascript code below.
     -->
     <script type="text/javascript">
-      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-                               m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-                              })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-      //__ENABLED_BY_PACK_SCRIPT__ga('create', 'UA-20555581-2', 'auto');
-      //__ENABLED_BY_PACK_SCRIPT__ga('set', 'page', 'via-2.0.0.html');
-      //__ENABLED_BY_PACK_SCRIPT__ga('send', 'pageview');
+     (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+       (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+                              m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+     })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+     //__ENABLED_BY_PACK_SCRIPT__ga('create', 'UA-20555581-2', 'auto');
+     //__ENABLED_BY_PACK_SCRIPT__ga('set', 'page', 'via-2.0.0.html');
+     //__ENABLED_BY_PACK_SCRIPT__ga('send', 'pageview');
     </script>
+
+
+    <!-- sortable library for sorting points -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.13.0/Sortable.min.js"></script>
+    <!-- library to select dropdown -->
+    <!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@9.0.1/public/assets/styles/base.min.css" /> -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js@9.0.1/public/assets/styles/choices.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/choices.js@9.0.1/public/assets/scripts/choices.min.js"></script>
+    
+    <!-- need these to load files -->
+    <script src="lib/toml.js"></script>
+    <script src="lib/yaml.js"></script>
 
     <link rel="stylesheet" type="text/css" href="via.css">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.13.0/Sortable.min.js"></script>
-    <script src="lib/toml.js"></script>
-    <script src="lib/yaml.js"></script>
+    <!-- required libraries for triangulation -->
+    <script src="https://unpkg.com/svd-js" type="application/javascript"></script>
+    <script src="https://unpkg.com/mathjs@12.4.1" type="application/javascript"></script>
+    <script src="lib/triangulation.js"></script>
   </head>
 
   <body onload="_via_init()" onresize="_via_update_ui_components()">
@@ -203,13 +216,7 @@
       <div class="content">
         <p class="title">Bodyparts editor</p>
         <div class="bodyparts_confirm">
-          <button id="bodyparts_add_part"
-                  onclick="add_bodypart()">
-            Add bodypart
-          </button>
 
-          &nbsp;
-          
           <button id="bodyparts_import_button"
                   onclick="bodyparts_import()">
             Import
@@ -230,8 +237,38 @@
           </button>
         </div>
 
-        <ul id="bodypart_list">
-        </ul>
+        <br/>
+
+        <div class="bodyparts_lines">
+          <h4>Lines</h4>
+          <div id="bodyparts_lines_simple">
+            <button id="bodyparts_add_lines"
+                    onclick="start_editing_line()">
+              Add new line
+            </button>
+          </div>
+          <div id="bodyparts_lines_editor">
+            <button id="bodyparts_lines_finish"
+                    onclick="finish_editing_line()">
+              Finish editing line
+            </button>
+            <div id="lines_selector_holder"></div>
+          </div>
+          <ul id="bodypart_line_list">
+          </ul>
+        </div>
+
+        <br/>
+
+        <div class="bodyparts_points">
+          <h4>Bodyparts</h4>
+          <button id="bodyparts_add_part"
+                  onclick="add_bodypart()">
+            Add bodypart
+          </button>
+          <ul id="bodypart_point_list">
+          </ul>
+        </div>
 
       </div>
     </div>
@@ -279,6 +316,7 @@
               <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
               <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>
               <li onclick="sel_local_slp()" title="Load SLP file">Load SLEAP dataset (SLP file)</li>
+              <li onclick="sel_local_anipose()" title="Load Anipose dataset">Load Anipose dataset</li>
               <li class="submenu_divider"></li>
               <li onclick="sel_local_data_file('annotations')" title="Import annotations from a CSV file">Import annotations (from csv)</li>
               <li onclick="sel_local_data_file('annotations')" title="Import annotations from a JSON file">Import annotations (from json)</li>
@@ -300,6 +338,7 @@
             <ul>
               <li onclick="download_all_region_data('deeplabcut', 'h5')" title="Export annotations to DeepLabCut format">Export Annotations (DeepLabCut format)</li>
               <li onclick="download_all_region_data('lp', 'csv')" title="Export annotations to Lightning Pose format">Export Annotations (Lightning Pose format)</li>
+              <li onclick="download_all_region_data('lp', 'csv')" title="Export annotations to Anipose format">Export Annotations (Anipose format)</li>
               <li onclick="download_all_region_data('slp', 'pkg.slp')" title="Export annotations to SLP format">Export Annotations (SLP format)</li>
               <li onclick="download_all_region_data('img_slp', 'pkg.slp')" title="Export annotations to SLP format (with images)">Export Annotations (SLP format with images)</li>
               <li onclick="" class="submenu_divider"></li>
@@ -459,13 +498,24 @@
             </div>
           </div>
           <div id="img_fn_list"></div>
+
           <p>
             <div class="button_panel">
-              <span class="button" onclick="sel_local_images()" title="Add new file from local disk">Add Files</span>
-              <span class="button" onclick="project_file_add_url_with_input()" title="Add new file using URL">Add URL</span>
-              <span class="button" onclick="project_file_remove_with_confirm()" title="Remove selected file (i.e. file currently being shown) from project">Remove</span>
+              <span class="button" onclick="toggle_3d_annotation()" title="toggle 3d annotation">Toggle 3D annotation</span>
+              <span id="project_missing_button" class="button display_none"
+                    onclick="project_missing_points()" title="project missing points">
+                Project missing points
+              </span>
             </div>
           </p>
+
+          <!-- <p>
+               <div class="button_panel">
+               <span class="button" onclick="sel_local_images()" title="Add new file from local disk">Add Files</span>
+               <span class="button" onclick="project_file_add_url_with_input()" title="Add new file using URL">Add URL</span>
+               <span class="button" onclick="project_file_remove_with_confirm()" title="Remove selected file (i.e. file currently being shown) from project">Remove</span>
+               </div>
+               </p> -->
         </div>
 
         <!-- Attributes -->
@@ -595,7 +645,18 @@
           <!-- @todo: in future versions, this canvas will be replaced by a <svg> element -->
             <canvas id="region_canvas" width="1" height="1" tabindex="1">Sorry, your browser does not support HTML5 Canvas functionality which is required for this application.</canvas>
             <!-- here, a child div with id="annotation_editor" is added by javascript -->
+
         </div>
+        <div id="image_panel_3d">
+          <div id="other_views_panel" class="display_none">
+            <!--- simple image panels are added here to display other images -->
+          </div>
+
+          <div id="3d_model_panel">
+            <!-- placeholder panel to put in a 3d viewer -->
+          </div>
+        </div>
+
         <div id="image_grid_panel" class="display_area_content display_none">
 
           <div id="image_grid_group_panel">

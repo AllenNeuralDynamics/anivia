@@ -93,13 +93,13 @@ var VIA_ELLIPSE_EDGE_TOL          = 0.2; // euclidean distance
 var VIA_THETA_TOL                 = Math.PI/18; // 10 degrees
 var VIA_POLYGON_RESIZE_VERTEX_OFFSET  = 100;
 var VIA_CANVAS_DEFAULT_ZOOM_LEVEL_INDEX = 3;
-var VIA_CANVAS_ZOOM_LEVELS = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4, 5, 6, 7, 8, 9, 10];
+var VIA_CANVAS_ZOOM_LEVELS = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4, 5, 6, 7, 8, 10, 12, 15, 20];
 var VIA_REGION_COLOR_LIST = ["#E69F00", "#56B4E9", "#009E73", "#D55E00", "#CC79A7", "#F0E442", "#ffffff"];
 // radius of control points in all shapes
 var VIA_REGION_SHAPES_POINTS_RADIUS = 3;
 // radius of control points in a point
-var VIA_REGION_POINT_RADIUS         = 3;
-var VIA_REGION_POINT_RADIUS_DEFAULT = 3;
+var VIA_REGION_POINT_RADIUS         = 4;
+var VIA_REGION_POINT_RADIUS_DEFAULT = 4;
 
 var VIA_THEME_REGION_BOUNDARY_WIDTH = 3;
 var VIA_THEME_BOUNDARY_LINE_COLOR   = "black";
@@ -317,10 +317,17 @@ var VIA_COCO_EXPORT_ATTRIBUTE_TYPE = [VIA_ATTRIBUTE_TYPE.DROPDOWN,
 
 // Variables for animal annotation
 var _anivia_bodyparts = []; // list of bodyparts within each animal
+var _anivia_lines = []; // list of lines connecting bodyparts for ease
 var _anivia_instance_id = 0; // current instance id
 var _anivia_num_instances = 0; // number of instances, updated by image
 
+var _anivia_current_proj = {};
+
 var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
+
+// Variables for 3D annotation
+var calib_params = {};
+var _anivia_3d_enabled = false;
 
 //
 // Data structure to store metadata about file and regions
@@ -535,6 +542,26 @@ function show_image_grid_view() {
   }
 }
 
+function toggle_3d_annotation() {
+  // this will enable the 3d annotation viewer
+  _anivia_3d_enabled = !_anivia_3d_enabled;
+
+  const other_views_panel = document.getElementById("other_views_panel");
+  const model_panel = document.getElementById("3d_model_panel");
+  const project_missing_button = document.getElementById("project_missing_button");
+  if(_anivia_3d_enabled) {
+    other_views_panel.classList.remove('display_none');
+    model_panel.classList.remove('display_none');
+    project_missing_button.classList.remove('display_none');
+  } else {
+    other_views_panel.classList.add('display_none');
+    model_panel.classList.add('display_none');
+    project_missing_button.classList.add('display_none');
+  }
+
+  _via_show_img(_via_image_index);
+}
+
 //
 // Handlers for top navigation bar
 //
@@ -577,6 +604,15 @@ function sel_local_deeplabcut() {
   }
 }
 
+function sel_local_anipose() {
+  if (invisible_folder_input) {
+    invisible_folder_input.type = "file";
+    invisible_folder_input.webkitdirectory = true;
+    invisible_folder_input.onchange = project_file_add_anipose;
+    invisible_folder_input.click();
+  }
+}
+
 
 // invoked by menu-item buttons in HTML UI
 function download_all_region_data(type, file_extension) {
@@ -601,6 +637,9 @@ function download_all_region_data(type, file_extension) {
     }
     if ( file_extension !== 'csv' || file_extension !== 'json' ) { // always true?
       filename += '_' + type + '.' + file_extension;
+    }
+    if(type == "lp") {
+      filename = "CollectedData.csv";
     }
     save_data_to_local_file(all_region_data_blob, filename);
   }.bind(this), function(err) {
@@ -687,7 +726,7 @@ function import_annotations_from_deeplabcut_csv(data) {
   import_annotations_from_lightning_pose_csv(data, true);
 }
 
-function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
+function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, trim_camera) {
   return new Promise( function(ok_callback, err_callback) {
     if ( data === '' || typeof(data) === 'undefined') {
       err_callback();
@@ -699,14 +738,15 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
     var malformed_csv_lines_count = 0;
     var file_added_count = 0;
 
-    var line_split_regex = new RegExp('\n|\r|\r\n', 'g');
+    var line_split_regex = new RegExp('[\n\r]+', 'g');
     var csvdata = data.split(line_split_regex);
 
     // parse the header
     var scorer_row = parse_csv_line(csvdata[0])
     var bodypart_row = parse_csv_line(csvdata[1]);
     var coords_row = parse_csv_line(csvdata[2]);
-    
+
+
     if ( (scorer_row[0] != 'scorer' ||
            bodypart_row[0] != 'bodyparts' ||
            coords_row[0] != 'coords')  ||
@@ -741,6 +781,15 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
       if(trim_labeled_data) {
         filename = filename.replace("labeled-data/", "");
       }
+      if(trim_camera) {
+        let fileList = filename.split("/");
+        let folder = fileList[fileList.length - 2];
+        let name = fileList[fileList.length - 1];
+        let folderList = folder.split("--");
+        let camera = folderList[folderList.length - 1];
+        filename = camera + "/" + name;
+      }
+
       var img_id   = _via_get_image_id(filename, -1);
 
       // check if file is already present in this project
@@ -768,7 +817,7 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
         if(!points_row[bp]) {
           points_row[bp] = {}
         }
-        points_row[bp][coord] = parseFloat(d[col]);
+        points_row[bp][coord] = d[col];
       }
 
       for(var bp of bodyparts) {
@@ -777,9 +826,12 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data) {
 
         var region_i = new file_region();
         // coordinates
-        if(isNaN(x) || isNaN(y)) {
-          // TODO: better handling of missing points
-          region_i.shape_attributes = {cx: 10, cy: 10, name: "point"}; 
+        console.log(points_row[bp]['x']);
+        if((points_row[bp]['x'] == "") || (points_row[bp]['y'] == "")) {
+          continue; // don't import missing region
+        } else if(isNaN(x) || isNaN(y)) {
+          // place in explicitly missing corner
+          region_i.shape_attributes = {cx: Math.random()*35 + 10, cy: Math.random()*35 + 10, name: "point"};
         } else {
           region_i.shape_attributes = {cx: x, cy: y, name: "point"};
         }
@@ -1511,6 +1563,9 @@ async function export_project_to_lightning_pose(add_labeled_data) {
     var metadata = _via_img_metadata[img_id]
     console.log(metadata);
     var filename = metadata.filename;
+    if(metadata.realpath) {
+      filename = metadata.realpath;
+    }
     if(add_labeled_data) {
       filename = "labeled-data/" + filename;
     }
@@ -1545,9 +1600,12 @@ async function export_project_to_lightning_pose(add_labeled_data) {
       for (var coord of "xy") {
         var val;
         if(points_dict[instance_id] &&
-           points_dict[instance_id][bp] &&
-           points_dict[instance_id][bp]['visible']) {
-          val = points_dict[instance_id][bp][coord];
+           points_dict[instance_id][bp]) {
+          if(points_dict[instance_id][bp]['visible']) {
+            val = points_dict[instance_id][bp][coord];
+          } else {
+            val = "NaN";
+          }
         } else {
           val = "";
         }
@@ -1609,6 +1667,9 @@ async function export_project_to_slp_format(should_add_images) {
   for( var img_id of _via_image_id_list ) {
     var metadata = _via_img_metadata[img_id]
     var filename = metadata.filename;
+    if(metadata.realpath) {
+      filename = metadata.realpath;
+    }
     var fsplit = filename.split("/");
     var vidnum = parseInt(fsplit[0].replace("video", ""));
     var framenum = parseInt(fsplit[1]);
@@ -2796,7 +2857,9 @@ function _via_reg_canvas_mouseup_handler(e) {
             canvas_point_region.shape_attributes['cy'] = Math.round(_via_click_y0);
             _via_canvas_regions.push(canvas_point_region);
 
-
+            if( _anivia_3d_enabled ) {
+              _via_show_img(_via_image_index); // recompute 3d and redisplay
+            }
             annotation_editor_update_content();
             break;
           }
@@ -3393,6 +3456,11 @@ function _via_move_region(region_id, move_x, move_y) {
 
     canvas_attr['cx'] = Math.round( image_attr['cx'] / _via_canvas_scale);
     canvas_attr['cy'] = Math.round( image_attr['cy'] / _via_canvas_scale);
+
+    if( _anivia_3d_enabled ) {
+      _via_show_img(_via_image_index); // recompute 3d and redisplay
+    }
+
     break;
 
   case VIA_REGION_SHAPE.POLYLINE: // handled by polygon
@@ -3425,6 +3493,7 @@ function _via_move_region(region_id, move_x, move_y) {
       canvas_px[i] = Math.round( img_px[i] / _via_canvas_scale );
       canvas_py[i] = Math.round( img_py[i] / _via_canvas_scale );
     }
+
     break;
   }
 }
@@ -3505,6 +3574,15 @@ function draw_all_regions() {
       }
     }
 
+    if(_anivia_3d_enabled) {
+      let computed = _via_img_metadata[_via_image_id].regions[i].computed;
+      var error = undefined;
+      if(computed !== undefined) {
+        error = computed.error;
+      }
+      _via_reg_ctx.strokeStyle = get_error_color(error);
+    }
+
     switch( attr['name'] ) {
     case VIA_REGION_SHAPE.RECT:
       _via_draw_rect_region(attr['x'],
@@ -3546,6 +3624,11 @@ function draw_all_regions() {
       break;
     }
   }
+  draw_connecting_lines();
+}
+
+function draw_connecting_lines() {
+  // function to draw lines connecting points
 }
 
 // control point for resize of region boundaries
@@ -3744,40 +3827,50 @@ function _via_draw_polygon_region(all_points_x, all_points_y, is_selected, shape
   }
 }
 
-function _via_draw_point_region(cx, cy, is_selected) {
+function _via_draw_point_region(cx, cy, is_selected, ctx, r) {
+  if(!r) {
+    r = VIA_REGION_POINT_RADIUS;
+  }
+  if(!ctx) {
+    ctx = _via_reg_ctx;
+  }
+
   if (is_selected) {
-    _via_draw_point(cx, cy, VIA_REGION_POINT_RADIUS);
+    _via_draw_point(cx, cy, r, ctx);
 
-    _via_reg_ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
-    _via_reg_ctx.stroke();
+    ctx.strokeStyle = VIA_THEME_SEL_REGION_FILL_BOUNDARY_COLOR;
+    ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH;
+    ctx.stroke();
 
-    _via_reg_ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
-    _via_reg_ctx.globalAlpha = VIA_THEME_SEL_REGION_OPACITY;
-    _via_reg_ctx.fill();
-    _via_reg_ctx.globalAlpha = 1.0;
+    ctx.fillStyle   = VIA_THEME_SEL_REGION_FILL_COLOR;
+    ctx.globalAlpha = VIA_THEME_SEL_REGION_OPACITY;
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
   } else {
     // draw a fill line
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH*1.5;
-    _via_draw_point(cx, cy, VIA_REGION_POINT_RADIUS);
-    _via_reg_ctx.stroke();
+    ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH*1.5;
+    _via_draw_point(cx, cy, r, ctx);
+    ctx.stroke();
 
     // draw a boundary line on both sides of the fill line
-    _via_reg_ctx.strokeStyle = VIA_THEME_BOUNDARY_LINE_COLOR;
-    _via_reg_ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
+    ctx.strokeStyle = VIA_THEME_BOUNDARY_LINE_COLOR;
+    ctx.lineWidth   = VIA_THEME_REGION_BOUNDARY_WIDTH/2;
     _via_draw_point(cx, cy,
-                    VIA_REGION_POINT_RADIUS - VIA_THEME_REGION_BOUNDARY_WIDTH/2);
-    _via_reg_ctx.stroke();
+                    r - VIA_THEME_REGION_BOUNDARY_WIDTH/2, ctx);
+    ctx.stroke();
     _via_draw_point(cx, cy,
-                    VIA_REGION_POINT_RADIUS + VIA_THEME_REGION_BOUNDARY_WIDTH/2);
-    _via_reg_ctx.stroke();
+                    r + VIA_THEME_REGION_BOUNDARY_WIDTH/2, ctx);
+    ctx.stroke();
   }
 }
 
-function _via_draw_point(cx, cy, r) {
-  _via_reg_ctx.beginPath();
-  _via_reg_ctx.arc(cx, cy, r, 0, 2*Math.PI, false);
-  _via_reg_ctx.closePath();
+function _via_draw_point(cx, cy, r, ctx) {
+  if(!ctx) {
+    ctx = _via_reg_ctx;
+  }
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2*Math.PI, false);
+  ctx.closePath();
 }
 
 
@@ -4725,6 +4818,15 @@ function _via_reg_canvas_keydown_handler(e) {
       return;
     }
 
+    if ( e.key === 'm' ) {
+      if ( _via_is_region_selected ||
+           _via_is_all_region_selected ) {
+        mark_missing_sel_regions();
+      }
+      e.preventDefault();
+      return;
+    }
+
     
     if ( _via_is_region_selected ) {
       if ( e.key === 'ArrowRight' ||
@@ -4842,6 +4944,20 @@ function _via_polyshape_add_new_polyshape(img_id, region_shape, region_id) {
   }
 }
 
+function mark_missing_sel_regions() {
+  let regions = _via_img_metadata[_via_image_id].regions;
+  for ( var i = 0; i < _via_canvas_regions.length; ++i ) {
+    if( _via_region_selected_flag[i] ) {
+      regions[i].shape_attributes.cx = Math.random() * 38 + 10;
+      regions[i].shape_attributes.cy = Math.random() * 38 + 10;
+      _via_region_selected_flag[i] = false;
+    }
+  }
+
+  // redisplay
+  _via_show_img(_via_image_index);
+}
+
 function del_sel_regions() {
   if ( _via_display_area_content_name === VIA_DISPLAY_AREA_CONTENT_NAME.IMAGE_GRID ) {
     return;
@@ -4893,6 +5009,10 @@ function del_sel_regions() {
   annotation_editor_show();
 
   show_message('Deleted ' + del_region_count + ' selected regions');
+
+  if( _anivia_3d_enabled ) {
+    _via_show_img(_via_image_index); // recompute 3d and redisplay
+  }
 }
 
 function sel_all_regions() {
@@ -5268,6 +5388,8 @@ function move_to_next_image() {
 }
 
 function set_zoom(zoom_level_index) {
+  let zoom_changed = zoom_level_index != _via_canvas_zoom_level_index;
+
   if ( zoom_level_index === VIA_CANVAS_DEFAULT_ZOOM_LEVEL_INDEX ) {
     _via_is_canvas_zoomed = false;
     _via_canvas_zoom_level_index = VIA_CANVAS_DEFAULT_ZOOM_LEVEL_INDEX;
@@ -5275,6 +5397,16 @@ function set_zoom(zoom_level_index) {
     _via_is_canvas_zoomed = true;
     _via_canvas_zoom_level_index = zoom_level_index;
   }
+
+  var the_x = _via_current_x;
+  var the_y = _via_current_y;
+
+  // save relative cursor location in image
+  var rel_cursor_x = the_x/_via_reg_canvas.width;
+  var rel_cursor_y = the_y/_via_reg_canvas.height;
+  
+  // center image around cursor, if cursor was in image
+  // use window.scroll
 
   var zoom_scale = VIA_CANVAS_ZOOM_LEVELS[_via_canvas_zoom_level_index];
   set_all_canvas_scale(zoom_scale);
@@ -5286,10 +5418,20 @@ function set_zoom(zoom_level_index) {
 
   if ( zoom_scale === 1 ) {
     VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT;
-  } else {
-    if ( zoom_scale > 1 ) {
-      VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT * zoom_scale;
-    }
+  }
+  // else {
+  //   if ( zoom_scale > 1 ) {
+  //     VIA_REGION_POINT_RADIUS = VIA_REGION_POINT_RADIUS_DEFAULT * zoom_scale;
+  //   }
+  // }
+
+  // move to adjust zoom
+  if(zoom_changed) {
+    var new_rel_cursor_x = the_x/_via_reg_canvas.width;
+    var new_rel_cursor_y = the_y/_via_reg_canvas.height;
+    var diff_x = (rel_cursor_x - new_rel_cursor_x) * _via_reg_canvas.width;
+    var diff_y = (rel_cursor_y - new_rel_cursor_y) * _via_reg_canvas.height;
+    window.scrollBy(diff_x, diff_y);
   }
 
   _via_load_canvas_regions(); // image to canvas space transform
@@ -7020,22 +7162,92 @@ function hide_bodyparts_editor_panel() {
 }
 
 
-var bodypart_list = document.getElementById("bodypart_list");
+var bodypart_point_list = document.getElementById("bodypart_point_list");
+var bodypart_line_list = document.getElementById("bodypart_line_list");
 
 function create_bodyparts_editor_panel(bodyparts) {
   if(!bodyparts) {
     bodyparts = _anivia_bodyparts;
   }
-  bodypart_list.innerHTML = '';
+  bodypart_point_list.innerHTML = '';
   for(var i=0; i<bodyparts.length; i++) {
     add_bodypart(bodyparts[i]);
   }
+
+  bodypart_line_list.innerHTML = '';
+  for(var i=0; i<_anivia_lines.length; i++) {
+    add_line(_anivia_lines[i].toString());
+  }
+
+  hide_lines_editor();
+
   show_bodyparts_editor_panel();
+}
+
+function hide_lines_editor() {
+  document.getElementById("bodyparts_lines_simple").style.display = 'block';
+  document.getElementById("bodyparts_lines_editor").style.display = 'none';
+}
+
+function show_lines_editor() {
+  document.getElementById("bodyparts_lines_simple").style.display = 'none';
+  document.getElementById("bodyparts_lines_editor").style.display = 'block';
+}
+
+function start_editing_line() {
+  // show selector with list
+  const selector_holder = document.getElementById("lines_selector_holder");
+
+  selector_holder.innerHTML = '<select multiple id="lines_selector"></select>';
+
+  const selector = document.getElementById('lines_selector');
+  const bodyparts = _anivia_bodyparts;
+
+  let possible = [];
+  for(var bp of bodyparts) {
+    possible.push({
+      value: bp,
+      label: bp,
+      selected: false,
+      disabled: false
+    })
+  }
+  
+  const choices = new Choices(selector, {
+       choices: possible,
+       removeItems: true,
+       removeItemButton: true,
+   });
+
+  show_lines_editor()
+}
+
+function finish_editing_line() {
+  const options = document.getElementById("lines_selector").selectedOptions;
+  var items = [];
+  for(var i=0; i<options.length; i++) {
+    items.push(options[i].value);
+  }
+  const line = items.toString();
+  add_line(line);
+  hide_lines_editor();
+}
+
+function add_line(line_str) {
+  var item = document.createElement("li");
+  item.innerHTML = '<span>' + line_str + '</span>' +
+    '<button onclick="remove_line(event)" class="remove-btn">Remove</button>';
+  bodypart_line_list.appendChild(item);
 }
 
 function remove_bodypart(event) {
   var item = event.target.parentNode;
-  bodypart_list.removeChild(item);
+  bodypart_point_list.removeChild(item);
+}
+
+function remove_line(event) {
+  var item = event.target.parentNode;
+  bodypart_line_list.removeChild(item);
 }
 
 function add_bodypart(item_name) {
@@ -7046,12 +7258,12 @@ function add_bodypart(item_name) {
     var item = document.createElement("li");
     item.innerHTML = '<span>' + item_name + '</span>' +
       '<button onclick="remove_bodypart(event)" class="remove-btn">Remove</button>';
-    bodypart_list.appendChild(item);
+    bodypart_point_list.appendChild(item);
   }
 }
 
 function bodyparts_update_from_li() {
-  var lis = bodypart_list.getElementsByTagName('li');
+  var lis = bodypart_point_list.getElementsByTagName('li');
   var bodyparts = [];
 
   for (var i = 0; i < lis.length; i++) {
@@ -7064,8 +7276,23 @@ function bodyparts_update_from_li() {
   return bodyparts;
 }
 
+function lines_update_from_li() {
+  var lis = bodypart_line_list.getElementsByTagName('li');
+  var lines = [];
+
+  for (var i = 0; i < lis.length; i++) {
+    var span = lis[i].getElementsByTagName('span')[0];
+    var item = span.textContent;
+    lines.push(item.split(","))
+  }
+  console.log(lines);
+  _anivia_lines = lines;
+  return lines;
+}
+
 function bodyparts_save_edit() {
   bodyparts_update_from_li();
+  lines_update_from_li();
   hide_bodyparts_editor_panel()
 }
   
@@ -7120,7 +7347,7 @@ function bodyparts_export() {
 
                    
 // Reorder functionality
-Sortable.create(bodypart_list, {
+Sortable.create(bodypart_point_list, {
   animation: 150,
   onStart: function(event) {
     event.item.style.cursor = "move";
@@ -8539,8 +8766,7 @@ async function project_file_add_slp(event) {
           if(visible) {
             region_i.shape_attributes = {"name": "point", "cx": point[0], "cy": point[1]};
           } else {
-            // TODO: make the x y missing values distinct
-            region_i.shape_attributes = {"name": "point", "cx": 10, "cy": 10};
+            region_i.shape_attributes = {"name": "point", "cx": Math.random()*35 + 10, "cy": Math.random*35 + 10};
           }
           // name for label, instance_id for group color
           region_i.region_attributes = {"name": bodyparts[point_id - start],
@@ -8666,7 +8892,192 @@ function project_file_add_deeplabcut(event, is_s3 = false) {
 }
 
 
+function project_file_add_anipose(event) {
+  var files = Array.from(event.target.files);
+  files.sort(function(a, b) {
+    return a.webkitRelativePath.localeCompare(b.webkitRelativePath);
+  });
+
+  window.files = files;
+
+  // add the images
+  var new_img_index_list = [];
+  var discarded_file_count = 0;
+  for ( var i = 0; i < files.length; ++i ) {
+    var filetype = files[i].type.substr(0, 5);
+    console.log(files[i].type);
+    if ( filetype === 'image' ) {
+      // check which filename in project matches the user selected file
+      var img_index = _via_image_filename_list.indexOf(files[i].name);
+      if( img_index === -1) {
+        // a new file was added to project
+        var path = files[i].webkitRelativePath;
+        var pathList = path.split("/");
+        var folder = pathList[pathList.length - 2];
+        var name = pathList[pathList.length - 1];
+        var folderList = folder.split("--");
+        var camera = folderList[folderList.length - 1];
+        var fullpath = "";
+        if(camera) {
+          fullpath = camera + "/";
+        }
+        fullpath = fullpath + name;
+        var realpath = "";
+        if(folder) {
+          realpath = folder + "/";
+        }
+        realpath = realpath + name;
+
+          var new_img_id = project_add_new_file(fullpath);
+        _via_img_metadata[new_img_id].camera = camera;
+        _via_img_metadata[new_img_id].folder = folder;
+        _via_img_metadata[new_img_id].name = name;
+        _via_img_metadata[new_img_id].realpath = realpath;
+        _via_img_fileref[new_img_id] = files[i];
+        set_file_annotations_to_default_value(new_img_id);
+        new_img_index_list.push( _via_image_id_list.indexOf(new_img_id) );
+      } else {
+        // an existing file was resolved using browser's file selector
+        var img_id = _via_image_id_list[img_index];
+        _via_img_fileref[img_id] = files[i];
+        _via_img_metadata[img_id]['size'] = files[i].size;
+      }
+    } else {
+      discarded_file_count += 1;
+    }
+  }
+
+  // show the images
+  if ( _via_img_metadata ) {
+    var status_msg = 'Loaded ' + new_img_index_list.length + ' images.';
+    if ( discarded_file_count ) {
+      status_msg += ' ( Discarded ' + discarded_file_count + ' non-image files! )';
+    }
+    show_message(status_msg);
+
+    if ( new_img_index_list.length ) {
+      // show first of newly added image
+      _via_show_img( new_img_index_list[0] );
+    } else {
+      // show original image
+      _via_show_img ( _via_image_index );
+    }
+    update_img_fn_list();
+  } else {
+    show_message("Please upload some image files!");
+  }
+
+
+  var calib_file;
+  var config_file;
+  for ( var i = 0; i < files.length; ++i ) {
+    var depth = files[i].webkitRelativePath.split("/").length;
+    if(depth == 2) {
+      if(files[i].name == "calibration.toml") {
+        calib_file = files[i];
+      } else if(files[i].name == "config.toml") {
+        config_file = files[i];
+      }
+    }
+  }
+
+
+  // load the annotations
+  // for ( var i = 0; i < files.length; ++i ) {
+  //   var path = files[i].webkitRelativePath;
+  //   var pathList = path.split("/");
+  //   var depth = pathList.length;
+  //   var folder = pathList[pathList.length - 2];
+  //   var name = pathList[pathList.length - 1];
+  //   var fullpath = "";
+  //   if(folder) {
+  //     fullpath = folder + "/";
+  //   }
+  //   fullpath = fullpath + name;
+  //   if(path.slice(path.length-3) == ".h5") {
+  //     const h5_file = files[i];
+  //     const formData = new FormData();
+  //     formData.append('file', h5_file);
+
+  //     fetch(ANIVIA_H5_CONVERTER_SERVER + '/h5_to_csv', {
+  //       method: 'POST',
+  //       body: formData
+  //     }).then(response => response.text())
+  //       .then(csvData => {
+  //         import_annotations_from_lightning_pose_csv(csvData, true);
+  //       })
+  //   }
+  // }
+
+  var csv_file;
+  for ( var i = 0; i < files.length; ++i ) {
+    let pathList = files[i].webkitRelativePath.split("/");
+    let name = pathList[pathList.length - 1];
+    if( (files[i].type == 'text/csv') &&
+        (pathList.length == 2) &&
+        (name == 'CollectedData.csv') ) {
+      // top level csv
+      csv_file = files[i];
+      break;
+    }
+  }
+  if(csv_file) {
+    load_text_file(csv_file, function(fname) {
+      import_annotations_from_lightning_pose_csv(fname, false, true)
+    });
+  } else {
+    console.log("missing csv annotation file!");
+  }
+
+  // promises to load both calib and config files 
+  Promise.all([
+    new Promise((resolve, reject) => {
+      load_text_file(calib_file, (text) => {
+        const calibration = TOML.parse(text);
+        resolve(calibration);
+      });
+    }),
+    new Promise((resolve, reject) => {
+      load_text_file(config_file, (text) => {
+        const config = TOML.parse(text);
+        resolve(config);
+      });
+    })
+  ]).then(([calibration, config]) => {
+    // Both calibration and config are loaded now, you can use them here
+    console.log('Calibration:', calibration);
+    console.log('Config:', config);
+    
+    // load the regex, cropping parameters, and calibration
+    // into our internal format
+
+    // load calibration
+    calib_params = {camera_order: [], cameras: {}};
+
+    for(var key of Object.keys(calibration)) {
+      if(key.substr(0, 3) != "cam") continue;
+      var value = calibration[key];
+      calib_params['cameras'][value['name']] = value;
+      calib_params['camera_order'].push(value['name']);
+    }
+
+    // load config params
+    // calib_params['cam_regex'] = config['triangulation']['cam_regex'];
+    for(var key of Object.keys(calib_params['cameras'])) {
+      try {
+        calib_params['cameras'][key]['offset'] = config['cameras'][key]['offset'];
+      } catch {
+        calib_params['cameras'][key]['offset'] = [0, 0];
+      }
+    }
+  }).catch((error) => {
+    console.error('Error loading files:', error);
+  });
+
+}
+
 function project_file_add_lightning_pose(event, is_s3 = false) {
+
   var files = Array.from(event.target.files);
   files.sort(function(a, b) {
     return (is_s3) ? a.s3RelativePath.localeCompare(b.s3RelativePath)
@@ -8801,7 +9212,7 @@ function project_file_add_local(event) {
 function project_file_add_abs_path_with_input() {
   var config = {'title':'Add File using Absolute Path' };
   var input = { 'absolute_path': { type:'text', name:'add one absolute path', placeholder:'/home/abhishek/image1.jpg', disabled:false, size:50 },
-		'absolute_path_list': { type:'textarea', name:'or, add multiple paths (one path per line)', placeholder:'/home/abhishek/image1.jpg\n/home/abhishek/image2.jpg\n/home/abhishek/image3.png', disabled:false, rows:5, cols:80 }
+                'absolute_path_list': { type:'textarea', name:'or, add multiple paths (one path per line)', placeholder:'/home/abhishek/image1.jpg\n/home/abhishek/image2.jpg\n/home/abhishek/image3.png', disabled:false, rows:5, cols:80 }
               };
 
   invoke_with_user_inputs(project_file_add_abs_path_input_done, input, config);
@@ -10402,9 +10813,21 @@ function _via_cancel_current_image_loading() {
 }
 
 function _via_show_img(img_index) {
+  // console.log('_via_show_img')
   if ( _via_is_loading_current_image ) {
     return;
   }
+
+  if ( _anivia_3d_enabled ) {
+    update_reprojection_errors(img_index);
+
+    var other_indices = find_other_views(img_index);
+    show_other_views(other_indices);
+
+    // TODO: code to draw the 3D model
+    // - display the 3d points using the aniposeviz code
+  }
+
 
   var img_id = _via_image_id_list[img_index];
 
@@ -10455,20 +10878,332 @@ function _via_show_img(img_index) {
   } else {
     // image not in buffer, so first add this image to buffer
     _via_is_loading_current_image = true;
-    img_loading_spinbar(img_index, true);
+    // img_loading_spinbar(img_index, true);
     _via_img_buffer_add_image(img_index).then( function(ok_img_index) {
       _via_is_loading_current_image = false;
-      img_loading_spinbar(img_index, false);
+      // img_loading_spinbar(img_index, false);
       _via_show_img(img_index);
     }, function(err_img_index) {
       _via_is_loading_current_image = false;
-      img_loading_spinbar(img_index, false);
+      // img_loading_spinbar(img_index, false);
       show_page_404(img_index);
       console.log('_via_img_buffer_add_image() failed for file: ' + _via_image_filename_list[err_img_index]);
     });
   }
 
   recalculate_anivia_instance_nums(img_id);
+
+
+}
+
+function show_img_from_buffer_other_view(img_index, panel_id) {
+  // console.log(img_index + " " + panel_id);
+  var panel = document.getElementById(panel_id);
+  panel.onclick = function() {
+    _via_show_img(img_index);
+  }
+
+  // copy the img tag from image_panel into the appropriate camera panel
+  var img_id = _via_image_id_list[img_index];
+  var cimg_html_id = _via_img_buffer_get_html_id(img_index);
+  let cloned_image;
+  if ( _via_img_fileref[img_id] instanceof File ) {
+    let tmp_file_object_url = URL.createObjectURL(_via_img_fileref[img_id]);
+    cloned_image = document.createElement('img');
+    cloned_image.setAttribute('id',  cimg_html_id + "new");
+    cloned_image.setAttribute('src', tmp_file_object_url);
+    cloned_image.setAttribute('alt', 'Image loaded from base64 data of a local file selected by user.');
+  } else {
+    const current_image = document.getElementById(cimg_html_id);
+    cloned_image = current_image.cloneNode(true);
+  }
+  cloned_image.classList.add("visible");
+  panel.appendChild(cloned_image);
+
+  // add canvas
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('id', 'subpanel_region_canvas');
+  panel.appendChild(canvas);
+
+  cloned_image.addEventListener('load', function() {
+    var wh_ratio = cloned_image.naturalWidth / cloned_image.naturalHeight;
+    const height = 175;
+    const width = height * wh_ratio;
+
+    const scale = height / cloned_image.naturalHeight;
+
+    panel.style.height = height + 'px';
+    panel.style.width = width + 'px';
+
+    // resize canvas to fit
+    canvas.height = height;
+    canvas.width = width;
+
+    // load canvas regions for this canvas
+    const ctx = canvas.getContext('2d');
+
+    const regions = _via_img_metadata[img_id].regions;
+
+    for(var i=0; i<regions.length; ++i) {
+      let shape = regions[i].shape_attributes;
+      let reg = regions[i].region_attributes;
+      let computed = regions[i].computed;
+      if(shape.name == VIA_REGION_SHAPE.POINT) {
+        // only draw points for now
+        var error = undefined;
+        if(computed !== undefined) {
+          error = computed.error;
+        }
+        ctx.strokeStyle = get_error_color(error);
+        ctx.globalAlpha = 1.0;
+        _via_draw_point_region(shape['cx'] * scale, shape['cy'] * scale, false, ctx, 2);
+      }
+    }
+  });
+
+}
+
+function componentToHex(c) {
+  var hex = Math.round(c).toString(16);
+  return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
+function HSVtoRGB(h, s, v) {
+    var r, g, b, i, f, p, q, t;
+    if (arguments.length === 1) {
+        s = h.s, v = h.v, h = h.h;
+    }
+    i = Math.floor(h * 6);
+    f = h * 6 - i;
+    p = v * (1 - s);
+    q = v * (1 - f * s);
+    t = v * (1 - (1 - f) * s);
+    switch (i % 6) {
+        case 0: r = v, g = t, b = p; break;
+        case 1: r = q, g = v, b = p; break;
+        case 2: r = p, g = v, b = t; break;
+        case 3: r = p, g = q, b = v; break;
+        case 4: r = t, g = p, b = v; break;
+        case 5: r = v, g = p, b = q; break;
+    }
+    return {
+        r: Math.round(r * 255),
+        g: Math.round(g * 255),
+        b: Math.round(b * 255)
+    };
+}
+
+
+function get_error_color(error) {
+  if(isNaN(error)) {
+    return "#ffffff";
+  }
+
+  var low = 2;
+  var high = 15;
+
+  if(error < low) {
+    return "#00ff00";
+  } else if(error > high) {
+    return "#ff0000";
+  } else {
+    var r, g, b;
+    let ratio = (high - error) / (high - low);
+    r = 255 * (1 - ratio);
+    g = 255 * ratio;
+    b = 0;
+
+    let ret = rgbToHex(r, g, b);
+    // console.log(error + " " + ratio + " " +  ret);
+    return ret;
+  }
+}
+
+function show_other_views(other_indices) {
+  // clear the other_views_panel
+  var panel = document.getElementById("other_views_panel");
+  panel.innerHTML = '';
+  // load the images into the appropriate panels
+  for(var index of other_indices) {
+    const img_id = _via_image_id_list[index];
+    const metadata = _via_img_metadata[img_id];
+    const subpanel = document.createElement('div');
+    const subpanel_id = 'image_panel_' + metadata.camera;
+    subpanel.setAttribute('id', subpanel_id);
+    subpanel.classList.add('other_view');
+    panel.appendChild(subpanel);
+
+    show_img_from_buffer_other_view(index, subpanel_id);
+
+    // if(_via_buffer_img_index_list.includes(index)) {
+    //   show_img_from_buffer_other_view(index, subpanel_id);
+    // } else {
+    //   _via_img_buffer_add_image(index).then(function(ok_img_index) {
+    //     show_img_from_buffer_other_view(ok_img_index, subpanel_id);
+    //   });
+    // }
+  }
+}
+
+function update_reprojection_errors(img_index) {
+  var img_indices = find_other_views(img_index, true);
+  // get the 2d points across all views
+  var camera_names = [];
+  var all_points = [];
+  var max_length = 0;
+  var point_indexes = {};
+  for(var index of img_indices) {
+    var id = _via_image_id_list[index];
+    var meta = _via_img_metadata[id];
+    let cam = meta.camera;
+    point_indexes[cam] = {};
+
+    for(var i=0; i<meta.regions.length; i++) {
+      let region = meta.regions[i];
+      let name = region.region_attributes.name;
+      point_indexes[cam][name] = i;
+    }
+    
+    var pts = [];
+    for(var name of _anivia_bodyparts) {
+      let ix = point_indexes[cam][name];
+      let pt;
+      if(ix === undefined) {
+        // region not present
+        pt = [NaN, NaN]
+      } else {
+        let region = meta.regions[ix];
+        var shape = region.shape_attributes;
+        pt = [shape['cx'], shape['cy']];
+        if((pt[0] < 50) && (pt[1] < 50)) {
+          pt = [NaN, NaN];
+        }
+      }
+      pts.push(pt);
+    }
+    all_points.push(pts)
+    max_length = Math.max(max_length, pts.length);
+    camera_names.push(meta.camera);
+  }
+
+  _anivia_current_proj = {};
+  var num_points = max_length;
+  // var points_3d = [];
+  for(var i=0; i < num_points; i++) {
+    let name = _anivia_bodyparts[i];
+    var points = [];
+    for(var cnum=0; cnum < camera_names.length; cnum++) {
+      let pt = all_points[cnum][i];
+      points.push(pt);
+    }
+
+    // triangulate the points and get projections
+    var p3d = triangulate_points(points, calib_params);
+    var p2d_proj = project_points(p3d, calib_params);
+
+    var sum = 0;
+    var count = 0;
+    for(var cnum=0; cnum < camera_names.length; cnum++) {
+      let d = dist_points(p2d_proj[cnum], points[cnum])
+      if(!isNaN(d)) {
+        sum += d;
+        count += 1;
+      }
+    }
+    var mean_err = sum / count;
+
+    // place into data
+    for(var cnum=0; cnum < camera_names.length; cnum++) {
+      let index = img_indices[cnum];
+      var id = _via_image_id_list[index];
+      var meta = _via_img_metadata[id];
+      let cam = meta.camera;
+      let ix = point_indexes[cam][name];
+      if(ix !== undefined) {
+        meta.regions[ix].computed = {
+          proj_x: p2d_proj[cnum][0],
+          proj_y: p2d_proj[cnum][1],
+          error: mean_err
+        };
+      }
+
+      if(_anivia_current_proj[cam] === undefined) {
+        _anivia_current_proj[cam] = {};
+      }
+      _anivia_current_proj[cam][name] = p2d_proj[cnum];
+    }
+  }
+  console.log('updated reprojections!');
+}
+
+function project_missing_points() {
+  var meta = _via_img_metadata[_via_image_id];
+  let cam = meta.camera;
+  var point_indexes = {};
+  for(var i=0; i<meta.regions.length; i++) {
+      let region = meta.regions[i];
+      let name = region.region_attributes.name;
+      point_indexes[name] = i;
+  }
+
+  // identify missing
+  let missing = [];
+  for(var name of _anivia_bodyparts) {
+    if(point_indexes[name] === undefined) {
+      missing.push(name);
+    }
+  }
+
+  for(var name of missing) {
+    let p2d = _anivia_current_proj[cam][name];
+    if( // must be valid
+       (p2d !== undefined) && !isNaN(p2d[0]) &&
+        // don't project close to border
+       (p2d[0] > 20) && (p2d[0] < _via_current_image.naturalWidth - 20) &&
+       (p2d[1] > 20) && (p2d[1] < _via_current_image.naturalHeight - 20)) {
+
+      // add a new region
+      var point_region = new file_region();
+      point_region.shape_attributes['name'] = VIA_REGION_SHAPE.POINT;
+      point_region.shape_attributes['cx'] = Math.round(p2d[0]);
+      point_region.shape_attributes['cy'] = Math.round(p2d[1]);
+      point_region.region_attributes['name'] = name;
+      point_region.region_attributes['instance_id'] = _anivia_instance_id + "";
+      var region_count = _via_img_metadata[_via_image_id].regions.push(point_region);
+      var new_region_id = region_count - 1;
+      set_region_annotations_to_default_value( new_region_id );
+    }
+  }
+
+  if( _anivia_3d_enabled ) {
+    _via_show_img(_via_image_index); // recompute 3d and redisplay
+  }
+}
+
+
+function find_other_views(img_index, include_index) {
+  var img_id = _via_image_id_list[img_index];
+  var img_metadata = _via_img_metadata[img_id];
+  var camera_files = {};
+  for(var i=0; i<_via_image_id_list.length; i++) {
+    var id = _via_image_id_list[i];
+    var meta = _via_img_metadata[id];
+    if(meta.name == img_metadata.name) {
+      camera_files[meta.camera] = i;
+    }
+  }
+  var other_indices = [];
+  for(var camera of calib_params.camera_order) {
+    if(((camera != img_metadata.camera) || include_index)
+       && camera_files[camera] !== undefined) {
+      other_indices.push(camera_files[camera]);
+    }
+  }
+  return other_indices;
 }
 
 
@@ -10493,7 +11228,10 @@ function _via_buffer_hide_current_image() {
 
 function _via_show_img_from_buffer(img_index) {
   return new Promise( function(ok_callback, err_callback) {
-    _via_buffer_hide_current_image();
+    // _via_buffer_hide_current_image();
+    img_fn_list_ith_entry_selected(_via_image_index, false);
+    _via_clear_reg_canvas(); // clear old region shapes
+    const old_image = _via_current_image;
 
     var cimg_html_id = _via_img_buffer_get_html_id(img_index);
     _via_current_image = document.getElementById(cimg_html_id);
@@ -10504,7 +11242,11 @@ function _via_show_img_from_buffer(img_index) {
       return;
     }
     _via_current_image.classList.add('visible'); // now show the new image
-
+    if ( old_image && old_image != _via_current_image ) { // set up like this to avoid annoying flash
+      setTimeout(function() {
+        old_image.classList.remove('visible');
+      }, 20);
+    }
     _via_image_index = img_index;
     _via_image_id    = _via_image_id_list[_via_image_index];
     _via_current_image_filename = _via_img_metadata[_via_image_id].filename;
@@ -10571,7 +11313,7 @@ function _via_show_img_from_buffer(img_index) {
 
     // update img_fn_list
     img_fn_list_ith_entry_selected(_via_image_index, true);
-    img_fn_list_scroll_to_current_file();
+    // img_fn_list_scroll_to_current_file();
 
     // refresh the annotations panel
     annotation_editor_update_content();

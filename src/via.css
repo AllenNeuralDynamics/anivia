@@ -10,10 +10,16 @@ body {
     padding: 0;
     margin: 0;
     font-family: sans-serif;
+    background-color:#333;
+    color:#fff;
 }
 
 * {
     box-sizing: border-box;
+}
+
+.choices__item {
+    color: black;
 }
 
 input[type=text] {
@@ -187,6 +193,7 @@ textarea {
 #image_panel {
     position: relative;
     outline: none;
+    display: flex;
 }
 
 #image_panel img {
@@ -220,6 +227,39 @@ textarea {
     height: 4em;
     outline: none;
 }
+
+#other_views_panel {
+    margin-top: 20px;
+    height: 150px;
+}
+
+.other_view {
+    display: inline-block;
+    position: relative;
+    margin-right: 10px;
+}
+
+.other_view img {
+    visibility: visible !important;
+    opacity: 1 !important;
+    opacity: 0;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    outline: none;
+}
+
+.other_view canvas {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    outline: none;
+}
+
+
+
 
 /* image buffer
 #image_panel .fadein {
@@ -411,11 +451,15 @@ button.leftsidebar_accordion.active:after {
 }
 
 .button_panel .text_button, .text_button {
-    color: #0000ff;
+    color: #0077ff;
     padding: 0.2rem 0.2rem;
     -moz-user-select: none;
     -webkit-user-select: none;
     -ms-user-select: none;
+}
+
+a {
+    color: #0077ff;
 }
 
 .button_panel .flush_right {
@@ -437,9 +481,10 @@ button.leftsidebar_accordion.active:after {
 .button_panel .button {
     display: inline-block;
     padding: 0.35rem 0.5rem;
-    margin: 0 0.05rem;
+    margin: 0.05rem 0.05rem;
     cursor: pointer;
     background-color: #cccccc;
+    color: black;
     border-radius: 0.2rem;
     -moz-user-select: none;
     -webkit-user-select: none;
@@ -562,25 +607,29 @@ button.leftsidebar_accordion.active:after {
     margin: 10% auto;
     padding: 20px;
     border: 1px solid #888;
-    background-color: white;
+    /* background-color: white; */
+    background-color: #333;
     width: 80%;
     max-width: 500px;
 }
 
 #bodyparts_editor_panel ul {
-       padding: 0;
-       list-style: none;
-   }
+    padding: 0;
+    list-style: none;
+}
 
 #bodyparts_editor_panel li {
-       display: flex;
-       align-items: center;
-       justify-content: space-between;
-       margin-bottom: 10px;
-       padding: 6px;
-       border: 2px solid #222;
-   }
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
+    padding: 2px;
+    border: 2px solid #222;
+}
 
+#bodyparts_editor_panel .remove-btn {
+    font-size: 11px;
+}
 
 /*
   Overlay panel used to gather user inputs before invoking a function
@@ -870,6 +919,7 @@ ul.region_shape .selected {
 
 #img_fn_list li:hover {
     background-color: #d5e5ff;
+    color: black;
     cursor: pointer;
 }
 
