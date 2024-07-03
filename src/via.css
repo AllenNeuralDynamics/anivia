@@ -22,6 +22,10 @@ body {
     color: black;
 }
 
+.bootbox {
+    color: black;
+}
+
 input[type=text] {
     border: 1px solid #cccccc;
     margin: 0.6rem 0;
