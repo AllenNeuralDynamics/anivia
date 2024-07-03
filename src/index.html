@@ -276,11 +276,6 @@
 
           <li>Import
             <ul>
-              <li onclick="sel_s3_images('deeplabcut')" title="Load DeepLabCut dataset from S3">S3: Load DeepLabCut dataset</li>
-              <li onclick="sel_s3_images('lightning_pose')" title="Load Lightning Pose dataset from S3">S3: Load Lightning Pose dataset</li>
-              <li onclick="sel_s3_images('slp')" title="Load SLP file from S3">S3: Load SLEAP dataset (SLP file)</li>
-              <li onclick="sel_s3_images()" title="Load image files/folder from S3">S3: Load image file/folder</li>
-              <li class="submenu_divider"></li>
               <li onclick="sel_local_deeplabcut()" title="Load DeepLabCut dataset">Load DeepLabCut dataset</li>
               <li onclick="sel_local_lightning_pose()" title="Load Lightning Pose dataset">Load Lightning Pose dataset</li>
               <li onclick="sel_local_slp()" title="Load SLP file">Load SLEAP dataset (SLP file)</li>
@@ -293,6 +288,11 @@
               <li onclick="project_file_add_url_with_input()" title="Add images from a web URL (e.g. http://www.robots.ox.ac.uk/~vgg/software/via/images/swan.jpg)">Add files from URL</li>
               <li onclick="project_file_add_abs_path_with_input()" title="Add images using absolute path of file (e.g. /home/abhishek/image1.jpg)">Add file using absolute path</li>
               <li onclick="sel_local_data_file('files_url')" title="Add images from a list of web url or absolute path stored in a text file (one url or path per line)">Add url or path from text file</li>
+              <li class="submenu_divider"></li>
+              <li onclick="sel_s3_images('deeplabcut')" title="Load DeepLabCut dataset from S3">S3: Load DeepLabCut dataset</li>
+              <li onclick="sel_s3_images('lightning_pose')" title="Load Lightning Pose dataset from S3">S3: Load Lightning Pose dataset</li>
+              <li onclick="sel_s3_images('slp')" title="Load SLP file from S3">S3: Load SLEAP dataset (SLP file)</li>
+              <li onclick="sel_s3_images()" title="Load image files/folder from S3">S3: Load image file/folder</li>
             </ul>
           </li>
 
@@ -384,7 +384,7 @@
       <div class="menubar" style="float: inline-end" >
         <ul>
           <li id="username-display"></li>
-          <li id="login" onclick="promptLogin()" title="Login (for AIND users S3 access)" style="cursor:pointer;">Log in</li>
+          <!-- <li id="login" onclick="promptLogin()" title="Login (for AIND users S3 access)" style="cursor:pointer;">Log in</li> -->
           <li id="logout" onclick="promptLogout()" title="Logout" style="cursor:pointer;display:none">Log out</li>
         </ul>
       </div>
