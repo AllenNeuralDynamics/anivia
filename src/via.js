@@ -782,7 +782,7 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, tri
         filename = filename.replace("labeled-data/", "");
       }
       if(trim_camera) {
-        let fileList = filename.split("/");
+        let fileList = filename.replaceAll("\\", "/").split("/");
         let folder = fileList[fileList.length - 2];
         let name = fileList[fileList.length - 1];
         let folderList = folder.split("--");
@@ -1670,7 +1670,7 @@ async function export_project_to_slp_format(should_add_images) {
     if(metadata.realpath) {
       filename = metadata.realpath;
     }
-    var fsplit = filename.split("/");
+    var fsplit = filename.replaceAll("\\", "/").split("/");
     var vidnum = parseInt(fsplit[0].replace("video", ""));
     var framenum = parseInt(fsplit[1]);
 
@@ -8971,7 +8971,7 @@ function project_file_add_anipose(event) {
   var calib_file;
   var config_file;
   for ( var i = 0; i < files.length; ++i ) {
-    var depth = files[i].webkitRelativePath.split("/").length;
+    var depth = files[i].webkitRelativePath.replaceAll("\\", "/").split("/").length;
     if(depth == 2) {
       if(files[i].name == "calibration.toml") {
         calib_file = files[i];
@@ -9011,7 +9011,7 @@ function project_file_add_anipose(event) {
 
   var csv_file;
   for ( var i = 0; i < files.length; ++i ) {
-    let pathList = files[i].webkitRelativePath.split("/");
+    let pathList = files[i].webkitRelativePath.replaceAll("\\", "/").split("/");
     let name = pathList[pathList.length - 1];
     if( (files[i].type == 'text/csv') &&
         (pathList.length == 2) &&
@@ -9096,7 +9096,7 @@ function project_file_add_lightning_pose(event, is_s3 = false) {
        if( img_index === -1) {
         // a new file was added to project
         var path = is_s3 ? files[i].s3RelativePath : files[i].webkitRelativePath;
-        var pathList = path.split("/");
+        var pathList = path.replaceAll("\\", "/").split("/");
         var folder = pathList[pathList.length - 2];
         var name = pathList[pathList.length - 1];
         var fullpath = "";
@@ -9128,7 +9128,7 @@ function project_file_add_lightning_pose(event, is_s3 = false) {
   for ( var i = 0; i < files.length; ++i ) {
     csv_file_path = is_s3 ? files[i].s3RelativePath : files[i].webkitRelativePath;
     if( (files[i].type == 'text/csv') &&
-        (csv_file_path.split("/").length == 2) ) {
+        (csv_file_path.replaceAll("\\", "/").split("/").length == 2) ) {
       // top level csv
       csv_file = files[i];
       break;
