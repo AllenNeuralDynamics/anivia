@@ -826,7 +826,7 @@ function import_annotations_from_lightning_pose_csv(data, trim_labeled_data, tri
 
         var region_i = new file_region();
         // coordinates
-        console.log(points_row[bp]['x']);
+        // console.log(points_row[bp]['x']);
         if((points_row[bp]['x'] == "") || (points_row[bp]['y'] == "")) {
           continue; // don't import missing region
         } else if(isNaN(x) || isNaN(y)) {
