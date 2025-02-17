@@ -323,7 +323,11 @@ var _anivia_num_instances = 0; // number of instances, updated by image
 
 var _anivia_current_proj = {};
 
-var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
+// var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
+var ANIVIA_H5_CONVERTER_SERVER = "http://localhost:5000";
+
+// missing corner length
+var MISSING_CORNER_LENGTH = 60;
 
 // Variables for 3D annotation
 var calib_params = {};
@@ -1534,7 +1538,6 @@ function pack_via_metadata(return_type) {
 
 async function export_project_to_lightning_pose(add_labeled_data) {
 
-  var MISSING_CORNER_LENGTH = 50;
 
   var bodyparts = _anivia_bodyparts;
   var scorer = "scorer"; // maybe worth specifying?
@@ -1561,7 +1564,7 @@ async function export_project_to_lightning_pose(add_labeled_data) {
   
   for( var img_id of _via_image_id_list ) {
     var metadata = _via_img_metadata[img_id]
-    console.log(metadata);
+    // console.log(metadata);
     var filename = metadata.filename;
     if(metadata.realpath) {
       filename = metadata.realpath;
@@ -1623,8 +1626,6 @@ async function export_project_to_slp_format(should_add_images) {
   // should return hdf5 file of the project
 
   // NOTE: this function assumes points have name and instance_id attributes associated with them
-
-  var MISSING_CORNER_LENGTH = 50;
 
   var videos_json = [];
   var videos = {};
@@ -8928,7 +8929,7 @@ function project_file_add_anipose(event) {
         }
         realpath = realpath + name;
 
-          var new_img_id = project_add_new_file(fullpath);
+        var new_img_id = project_add_new_file(fullpath);
         _via_img_metadata[new_img_id].camera = camera;
         _via_img_metadata[new_img_id].folder = folder;
         _via_img_metadata[new_img_id].name = name;
@@ -11079,7 +11080,7 @@ function update_reprojection_errors(img_index) {
         let region = meta.regions[ix];
         var shape = region.shape_attributes;
         pt = [shape['cx'], shape['cy']];
-        if((pt[0] < 50) && (pt[1] < 50)) {
+        if((pt[0] < MISSING_CORNER_LENGTH) && (pt[1] < MISSING_CORNER_LENGTH)) {
           pt = [NaN, NaN];
         }
       }
@@ -11206,6 +11207,27 @@ function find_other_views(img_index, include_index) {
   return other_indices;
 }
 
+
+function recalibrate() {
+  // alert("not implemented yet!")
+  export_project_to_lightning_pose(true).then(function(data) {
+    var file = new File([data], "data.csv");
+    var formData = new FormData();
+    formData.append('file', file);
+    formData.append('calibration', JSON.stringify(calib_params));
+
+    fetch(ANIVIA_H5_CONVERTER_SERVER + '/recalibrate', {
+      method: 'POST',
+      body: formData
+    }).then(response => response.json())
+      .then(calibData => {
+        calib_params = calibData;
+        alert("updated calibration parameters!")
+        update_reprojection_errors(_via_image_index);
+      })
+  });
+
+}
 
 function recalculate_anivia_instance_nums(img_id) {
   var regions = _via_img_metadata[img_id].regions;
