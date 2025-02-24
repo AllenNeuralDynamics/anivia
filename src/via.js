@@ -323,8 +323,8 @@ var _anivia_num_instances = 0; // number of instances, updated by image
 
 var _anivia_current_proj = {};
 
-// var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
-var ANIVIA_H5_CONVERTER_SERVER = "http://localhost:5000";
+var ANIVIA_H5_CONVERTER_SERVER = "https://converter.lambdaloop.com";
+// var ANIVIA_H5_CONVERTER_SERVER = "http://localhost:5000";
 
 // missing corner length
 var MISSING_CORNER_LENGTH = 60;
@@ -553,14 +553,17 @@ function toggle_3d_annotation() {
   const other_views_panel = document.getElementById("other_views_panel");
   const model_panel = document.getElementById("3d_model_panel");
   const project_missing_button = document.getElementById("project_missing_button");
+  const recalibrate_button = document.getElementById("recalibrate_button");
   if(_anivia_3d_enabled) {
     other_views_panel.classList.remove('display_none');
     model_panel.classList.remove('display_none');
     project_missing_button.classList.remove('display_none');
+    recalibrate_button.classList.remove('display_none');
   } else {
     other_views_panel.classList.add('display_none');
     model_panel.classList.add('display_none');
     project_missing_button.classList.add('display_none');
+    recalibrate_button.classList.add('display_none');
   }
 
   _via_show_img(_via_image_index);
@@ -11224,6 +11227,7 @@ function recalibrate() {
         calib_params = calibData;
         alert("updated calibration parameters!")
         update_reprojection_errors(_via_image_index);
+        _via_show_img(_via_image_index);
       })
   });
 
