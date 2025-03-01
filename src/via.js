@@ -4826,6 +4826,7 @@ function _via_reg_canvas_keydown_handler(e) {
       if ( _via_is_region_selected ||
            _via_is_all_region_selected ) {
         mark_missing_sel_regions();
+        _via_reg_canvas.style.cursor = "default";
       }
       e.preventDefault();
       return;
@@ -11221,7 +11222,8 @@ function recalibrate() {
 
     fetch(ANIVIA_H5_CONVERTER_SERVER + '/recalibrate', {
       method: 'POST',
-      body: formData
+      body: formData,
+      timeout: 300000
     }).then(response => response.json())
       .then(calibData => {
         calib_params = calibData;
