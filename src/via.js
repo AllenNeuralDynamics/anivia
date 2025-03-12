@@ -4959,6 +4959,7 @@ function mark_missing_sel_regions() {
     }
   }
 
+  _via_reg_canvas.style.cursor = "default";
   // redisplay
   _via_show_img(_via_image_index);
 }
